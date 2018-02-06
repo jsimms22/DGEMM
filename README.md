@@ -17,3 +17,6 @@ https://www.youtube.com/watch?v=E8TXME3bzNs
 
 https://portal.xsede.org/psc-bridges#overview
 system overview for bridges cluster
+
+http://www.netlib.org/lapack/explore-html/d1/d54/group__double__blas__level3_gaeda3cbd99c8fb834a60a6412878226e1.html#gaeda3cbd99c8fb834a60a6412878226e1
+dgemm from blas source code
