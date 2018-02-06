@@ -14,3 +14,6 @@ commands that are useful
   
 https://www.youtube.com/watch?v=E8TXME3bzNs
 30 minute tutorial on github
+
+https://portal.xsede.org/psc-bridges#overview
+system overview for bridges cluster
