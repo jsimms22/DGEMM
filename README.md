@@ -20,3 +20,6 @@ system overview for bridges cluster
 
 http://www.netlib.org/lapack/explore-html/d1/d54/group__double__blas__level3_gaeda3cbd99c8fb834a60a6412878226e1.html#gaeda3cbd99c8fb834a60a6412878226e1
 dgemm from blas source code
+
+https://ac.els-cdn.com/S1877050912001354/1-s2.0-S1877050912001354-main.pdf?_tid=44415eac-0ae9-11e8-8be7-00000aab0f26&acdnat=1517885942_fdc507aecc94f0dadde2746529b3918e
+paper discussing comparisons in dgemm algorithms, might be useful for our considerations
