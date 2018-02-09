@@ -15,12 +15,11 @@
 
 const char* dgemm_desc = "Simple blocked dgemm.";
 
-#if !defined(BLOCK_SIZE)
+/*#if !defined(BLOCK_SIZiE)
 #define BLOCK_SIZE 100
-#endif
+#endif*/
 
 #define min(a,b) (((a)<(b))?(a):(b))
-
 
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
@@ -46,6 +45,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  * On exit, A and B maintain their input values. */
 void square_dgemm (int lda, double* A, double* B, double* C)
 {
+  int BLOCK_SIZE = 41;
   /* For each block-row of A */
   for (int i = 0; i < lda; i += BLOCK_SIZE)
     /* For each block-column of B */
