@@ -1,25 +1,26 @@
 /* 
-    Please include compiler name below (you may also include any other modules you would like to be loaded)
+ *     Please include compiler name below (you may also include any other modules you would like to be loaded)
+ *
+ *     COMPILER= gnu
+ *
+ *         Please include All compiler flags and libraries as you want them run. You can simply copy this over from the Makefile's first few lines
+ *          
+ *          CC = cc
+ *          OPT = -O3
+ *          CFLAGS = -Wall -std=gnu99 $(OPT)
+ *          MKLROOT = /opt/intel/composer_xe_2013.1.117/mkl
+ *          LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_sequential.a $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm
+ *
+ *          */
 
-COMPILER= gnu
-
-    Please include All compiler flags and libraries as you want them run. You can simply copy this over from the Makefile's first few lines
- 
-CC = cc
-OPT = -O3
-CFLAGS = -Wall -std=gnu99 -march=core2 -ftree-vectorize -funroll-loops -ffast-math $(OPT)
-MKLROOT = /opt/intel/composer_xe_2013.1.117/mkl
-LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_sequential.a $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm
-
-*/
-
-const char* dgemm_desc = "Our dgemm.";
+const char* dgemm_desc = "Simple blocked dgemm.";
 
 #if !defined(BLOCK_SIZE)
-#define BLOCK_SIZE 120
+#define BLOCK_SIZE 100
 #endif
 
 #define min(a,b) (((a)<(b))?(a):(b))
+
 
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
