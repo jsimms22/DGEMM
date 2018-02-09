@@ -31,7 +31,7 @@ void reference_dgemm (int N, double ALPHA, double* A, double* B, double* C)
 
 /* Your function must have the following signature: */
 extern const char* dgemm_desc;
-extern void dgemm (int, double*, double*, double*);
+extern void square_dgemm (int, double*, double*, double*);
 
 double wall_time ()
 {
@@ -114,12 +114,12 @@ int main (int argc, char **argv)
     for (int n_iterations = 1; seconds < timeout; n_iterations *= 2) 
     {
       /* Warm-up */
-      dgemm (n, A, B, C);
+      square_dgemm (n, A, B, C);
 
       /* Benchmark n_iterations runs of square_dgemm */
       seconds = -wall_time();
       for (int it = 0; it < n_iterations; ++it)
-	dgemm (n, A, B, C);
+	square_dgemm (n, A, B, C);
       seconds += wall_time();
 
       /*  compute Gflop/s rate */
@@ -136,7 +136,7 @@ int main (int argc, char **argv)
 
     /* C := A * B, computed with square_dgemm */
     memset (C, 0, n * n * sizeof(double));
-    dgemm (n, A, B, C);
+    square_dgemm (n, A, B, C);
 
     /* Do not explicitly check that A and B were unmodified on square_dgemm exit
      *  - if they were, the following will most likely detect it:   
@@ -171,7 +171,6 @@ int main (int argc, char **argv)
 
   /* Printing average percentage and grade to screen */
   printf("Average percentage of Peak = %g\nGrade = %g\n",aveper,grade);  
-
   free (buf);
 
   return 0;
