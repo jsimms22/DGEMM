@@ -43,9 +43,9 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  *  C := C + A * B
  * where A, B, and C are lda-by-lda matrices stored in column-major format. 
  * On exit, A and B maintain their input values. */
-void square_dgemm (int lda, double* A, double* B, double* C)
+void square_dgemm (/*int BLOCK_SIZE,*/int lda, double* A, double* B, double* C)
 {
-  int BLOCK_SIZE = 41;
+  register int BLOCK_SIZE = 72;
   /* For each block-row of A */
   for (int i = 0; i < lda; i += BLOCK_SIZE)
     /* For each block-column of B */
