@@ -28,7 +28,7 @@ const char* dgemm_desc = "Simple blocked dgemm.";
 static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
     register double ff[4];
-    if (K % 2 == 0) {
+    if ((K % 2) == 0) {
       /* For each row i of A */
       for (int i = 0; i < M; ++i)
         /* For each column j of B */
@@ -42,7 +42,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
         	ff[1] = A[(k+1)+i*lda];
         	ff[2] = B[k+j*lda];
         	ff[3] = B[(k+1)+j*lda];
-            cij += ff[0] * ff[2];
+                cij += ff[0] * ff[2];
         	cij += ff[1] * ff[3];
           }
           C[i+j*lda] = cij;
@@ -55,6 +55,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
         for (int j = 0; j < N; ++j)
         {
           /* Compute C(i,j) */
+	  
           register double cij = C[i+j*lda];
           for (int k = 0; k < K; ++k)
           {
@@ -73,13 +74,14 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  * On exit, A and B maintain their input values. */
 void square_dgemm (/*int BLOCK_SIZE,*/int lda, double* A, double* B, double* C)
 {
-  register int BLOCK_SIZE = 72, m=0;
+  register int BLOCK_SIZE = 72;
+  int m=0;
   double* AT = NULL;
   AT=(double*) malloc(lda*lda*sizeof(double));
   //Transposes A in memory for better allocation
   for (int i = 0; i < lda; ++i) {
       for (int k = 0; k < lda; ++k) {
-          AT[m]=A[i+k*lda];
+          AT[m]=A[i+(k*lda)];
           ++m;
       }
   }
@@ -90,9 +92,9 @@ void square_dgemm (/*int BLOCK_SIZE,*/int lda, double* A, double* B, double* C)
       /* Accumulate block dgemms into block of C */
       for (int k = 0; k < lda; k += BLOCK_SIZE)      {
 	/* Correct block dimensions if block "goes off edge of" the matrix */
-	int M = min (BLOCK_SIZE, lda-i);
-	int N = min (BLOCK_SIZE, lda-j);
-	int K = min (BLOCK_SIZE, lda-k);
+	register int M = min (BLOCK_SIZE, lda-i);
+	register int N = min (BLOCK_SIZE, lda-j);
+	register int K = min (BLOCK_SIZE, lda-k);
 
 	/* Perform individual block dgemm1 */
 	do_block(lda, M, N, K, AT + k + i*lda, B + k + j*lda, C + i + j*lda);
