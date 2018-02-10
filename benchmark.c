@@ -69,8 +69,8 @@ int main (int argc, char **argv)
 {
 /*double highestGrade = -1.0;
 int highBlock = 0;
-for (int iii = 5;iii < 200;++iii){*/
-  printf ("Description:\t%s\n\n", dgemm_desc);
+for (int iii = 5;iii < 200;++iii){
+*/  printf ("Description:\t%s\n\n", dgemm_desc);
 
   /* Test sizes should highlight performance dips at multiples of certain powers-of-two */
 
@@ -179,6 +179,7 @@ for (int iii = 5;iii < 200;++iii){*/
 	highestGrade = grade;
 	highBlock = iii;
   }
+printf("Finished block size: %d\t",iii);
 }
 printf("%d\t",highBlock);*/
   return 0;
