@@ -13,6 +13,7 @@
  *
  *          */
 
+#include <stdlib.h>
 const char* dgemm_desc = "Simple blocked dgemm.";
 
 /*#if !defined(BLOCK_SIZiE)
