@@ -26,16 +26,24 @@ const char* dgemm_desc = "Simple blocked dgemm.";
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
+  register double ff[4];
   /* For each row i of A */
   for (int i = 0; i < M; ++i)
     /* For each column j of B */
     for (int j = 0; j < N; ++j)
     {
       /* Compute C(i,j) */
-      double cij = C[i+j*lda];
-      for (int k = 0; k < K; ++k)
-        cij += A[i+k*lda] * B[k+j*lda];
-        C[i+j*lda] = cij;
+      register double cij = C[i+j*lda];
+      for (int k = 0; k < K; k += 2)
+      {
+	ff[0] = A[i+k*lda];
+	ff[1] = A[i+(k+1)*lda];
+	ff[2] = B[k+j*lda];
+	ff[3] = B[(k+1)+j*lda];
+        cij += ff[0] * ff[2];
+	cij += ff[1] * ff[3];
+      }
+      C[i+j*lda] = cij;
     }
 }
 
