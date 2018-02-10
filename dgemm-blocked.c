@@ -37,8 +37,8 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
           register double cij = C[i+j*lda];
           for (int k = 0; k < K; k += 2)
           {
-        	ff[0] = A[i+k*lda];
-        	ff[1] = A[i+(k+1)*lda];
+        	ff[0] = A[k+i*lda];
+        	ff[1] = A[k+(i+1)*lda];
         	ff[2] = B[k+j*lda];
         	ff[3] = B[(k+1)+j*lda];
             cij += ff[0] * ff[2];
@@ -57,7 +57,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
           register double cij = C[i+j*lda];
           for (int k = 0; k < K; ++k)
           {
-        	ff[0] = A[i+k*lda];
+        	ff[0] = A[k+i*lda];
         	ff[1] = B[k+j*lda];
             cij += ff[0] * ff[1];
           }
@@ -72,7 +72,16 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  * On exit, A and B maintain their input values. */
 void square_dgemm (/*int BLOCK_SIZE,*/int lda, double* A, double* B, double* C)
 {
-  register int BLOCK_SIZE = 72;
+  register int BLOCK_SIZE = 72, m=0;
+  double* AT = NULL;
+  AT=(double*) malloc(lda*lda*sizeof(double));
+  //Transposes A in memory for better allocation
+  for (int i = 0; i < lda; ++i) {
+      for (int k = 0; k < lda; ++k) {
+          AT[m]=A[i+k*lda];
+          ++m;
+      }
+  }
   /* For each block-row of A */
   for (int i = 0; i < lda; i += BLOCK_SIZE)
     /* For each block-column of B */
@@ -84,7 +93,8 @@ void square_dgemm (/*int BLOCK_SIZE,*/int lda, double* A, double* B, double* C)
 	int N = min (BLOCK_SIZE, lda-j);
 	int K = min (BLOCK_SIZE, lda-k);
 
-	/* Perform individual block dgemm */
-	do_block(lda, M, N, K, A + i + k*lda, B + k + j*lda, C + i + j*lda);
+	/* Perform individual block dgemm1 */
+	do_block(lda, M, N, K, AT + k + i*lda, B + k + j*lda, C + i + j*lda);
       }
+  free(AT);
 }
