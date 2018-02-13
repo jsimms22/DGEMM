@@ -36,9 +36,8 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
     register double cij = 0.0;
     if ((K % 4) == 0) {
     register double ff[8] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0} ;
-        for (int j = 0; j < N; ++j)
       for (int i = 0; i < M; ++i)
-       // for (int j = 0; j < N; ++j)
+        for (int j = 0; j < N; ++j)
         {
           cij = C[i+j*lda];
             for (int k = 0; k < K; k += 4)
@@ -61,9 +60,8 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
     }
     else if ((K % 2) != 0) {
     register double ff[4] = {0.0,0.0,0.0,0.0};
-        for (int j = 0; j < N; ++j)
       for (int i = 0; i < M; ++i)
-     //   for (int j = 0; j < N; ++j)
+        for (int j = 0; j < N; ++j)
         {
           cij = C[i+j*lda];
 	  cij += A[i*lda] * B[j*lda];
@@ -81,9 +79,8 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
     }
     else {
     register double ff[4] = {0.0,0.0,0.0,0.0};
-        for (int j = 0; j < N; ++j)
       for (int i = 0; i < M; ++i)
-     //   for (int j = 0; j < N; ++j)
+        for (int j = 0; j < N; ++j)
         {
           cij = C[i+j*lda];
             for (int k = 1; k < K; k += 2)
