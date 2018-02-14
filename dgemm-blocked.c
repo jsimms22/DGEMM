@@ -22,79 +22,15 @@ const char* dgemm_desc = "Simple blocked dgemm.";
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
-{    	
-	/*for (int i = 0; i < M; ++i) {
-	  double* iRowA = &A[i];
-	  double* iRowC = &C[i];
-	    for (int k = 0; k < K; ++k) {
-	      double* kRowB = &B[k];
-	      double ikA = iRowA[k];
-	        for (int j = 0; j < N; ++j)
-	          iRowC[j] += ikA * kRowB[j];
-	    }
-	}*/
-    register double cij = 0.0;
-    if ((K % 4) == 0) {
-    register double ff[8] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0} ;
-      for (int i = 0; i < M; ++i)
-        for (int j = 0; j < N; ++j)
-        {
-          cij = C[i+j*lda];
-            for (int k = 0; k < K; k += 4)
-            {
-	    ff[0] = A[k+i*lda];
-        	ff[1] = A[(k+1)+i*lda];
-        	ff[2] = A[(k+2)+i*lda];
-        	ff[3] = A[(k+3)+i*lda];
-		ff[4] = B[k+j*lda];
-		ff[5] = B[(k+1)+j*lda];
-		ff[6] = B[(k+2)+j*lda];
-		ff[7] = B[(k+3)+j*lda];
-                cij += ff[0] * ff[4];
-        	cij += ff[1] * ff[5];
-		cij += ff[2] * ff[6];
-		cij += ff[3] * ff[7];
-            }
-          C[i+j*lda] = cij;
-        }
+{
+  for (int i = 0; i < M; ++i) {
+    for (int j = 0; j < N; ++j) {
+      C[i*lda+j] = 0.0;
+      for (int k = 0; k < K; ++k) {
+	C[i*lda+j] += A[i*lda+k] * B[k*lda+j];
+      }
     }
-    else if ((K % 2) != 0) {
-    register double ff[4] = {0.0,0.0,0.0,0.0};
-      for (int i = 0; i < M; ++i)
-        for (int j = 0; j < N; ++j)
-        {
-          cij = C[i+j*lda];
-	  cij += A[i*lda] * B[j*lda];
-          for (int k = 1; k < K; k += 2)
-          {
-        	ff[0] = A[k+i*lda];
-       		ff[1] = B[k+j*lda];
-		ff[2] = A[(k+1)+i*lda];
-		ff[3] = B[(k+1)+j*lda];
-           	cij += ff[0] * ff[1];
-		cij += ff[2] * ff[3];
-          }
-          C[i+j*lda] = cij;
-        }
-    }
-    else {
-    register double ff[4] = {0.0,0.0,0.0,0.0};
-      for (int i = 0; i < M; ++i)
-        for (int j = 0; j < N; ++j)
-        {
-          cij = C[i+j*lda];
-            for (int k = 1; k < K; k += 2)
-            {
-                ff[0] = A[k+i*lda];
-                ff[1] = A[(k+1)+i*lda];
-                ff[2] = B[k+j*lda];
-                ff[3] = B[(k+1)+j*lda];
-                cij += ff[0] * ff[2];
-                cij += ff[1] * ff[3];
-            }
-          C[i+j*lda] += cij;
-        }
-    }
+  }   	
 }
 
 /* This routine performs a dgemm operation
@@ -106,28 +42,18 @@ void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
   register int BLOCK_SIZE = 72;
   register int m = 0;
   int M,N,K = 0;
+
   double* AT = NULL;
-  AT=(double*) malloc(lda*lda*sizeof(double));
+  AT=(double*) malloc(lda*lda*sizeof(double));  
   //Transposes A in memory for better allocation
   for (int i = 0; i < lda; ++i) {
-    if (lda % 2 == 0) {
-      for (int k = 0; k < lda; k+=2) {
-          AT[m]=A[i+(k*lda)];
-          ++m;
-	  AT[m]=A[i+((k+1)*lda)];
-	  ++m;
-      }
-    } else {
-      AT[m] = A[i];
+    for (int k = 0; k < lda; ++k) {
+      AT[m] = A[i+(k*lda)];
+      BT[m] = B[i+(k*lda)];
       ++m;
-      for (int k = 1; k < lda; k+=2) {
-	  AT[m]=A[i+(k*lda)];
-	  ++m;
-	  AT[m]=A[i+(k+1)*lda];
-	  ++m;
-      }
     }
   }
+
   /* For each block-row of A */
   for (int i = 0; i < lda; i += BLOCK_SIZE)
     /* For each block-column of B */
