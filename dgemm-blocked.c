@@ -14,6 +14,12 @@
  *          */
 
 #include <stdlib.h>
+#include <mmintrin.h>
+#include <pmmintrin.h>
+#include <xmmintrin.h>
+#include <emmintrin.h>
+//#include <ia64intrin.h>
+//#include <ia64regs.h>
 const char* dgemm_desc = "Simple blocked dgemm.";
 
 #define min(a,b) (((a)<(b))?(a):(b))
@@ -23,14 +29,22 @@ const char* dgemm_desc = "Simple blocked dgemm.";
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
-  for (int i = 0; i < M; ++i) {
+  //Do math here
+  __m128d m0,m1,m2,m3;
+  for (int i = 0; i < M; i += 8) {
     for (int j = 0; j < N; ++j) {
-      C[i*lda+j] = 0.0;
+      m0 = _mm_setzero_pd();  
       for (int k = 0; k < K; ++k) {
-	C[i*lda+j] += A[i*lda+k] * B[k*lda+j];
+	printf("Can you see me here\n");
+	m1 = _mm_load_pd(A+i+lda*k);
+	m2 = _mm_load_pd(B+k+lda*j); // should be m2 = _mm_broadcast_pd(B+k+lda*j), 
+				     // doesn't want to allow this implicit function
+	m3 = _mm_mul_pd(m1,m2);
+	m0 = _mm_add_pd(m0,m3);
       }
+      _mm_store_pd(C+i*lda+j,m0);
     }
-  }   	
+  }
 }
 
 /* This routine performs a dgemm operation
@@ -39,33 +53,76 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  * On exit, A and B maintain their input values. */
 void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
 {
-  register int BLOCK_SIZE = 72;
-  register int m = 0;
-  int M,N,K = 0;
-
-  double* AT = NULL;
-  AT=(double*) malloc(lda*lda*sizeof(double));  
-  //Transposes A in memory for better allocation
-  for (int i = 0; i < lda; ++i) {
-    for (int k = 0; k < lda; ++k) {
-      AT[m] = A[i+(k*lda)];
-      BT[m] = B[i+(k*lda)];
-      ++m;
+  //This is to print out a small n*n C matrix (before calculation)
+  if (lda == 8) {
+    for (int i = 0; i < lda; ++i) {
+      for (int k = 0; k < lda; ++k) {
+        printf("%g\t ",C[i+lda*k]);
+      }
+      printf("\n");
     }
   }
 
-  /* For each block-row of A */
-  for (int i = 0; i < lda; i += BLOCK_SIZE)
-    /* For each block-column of B */
-    for (int j = 0; j < lda; j += BLOCK_SIZE)
-      /* Accumulate block dgemms into block of C */
-      for (int k = 0; k < lda; k += BLOCK_SIZE){
-	/* Correct block dimensions if block "goes off edge of" the matrix */
-	M = min (BLOCK_SIZE, lda-i);
-	N = min (BLOCK_SIZE, lda-j);
-	K = min (BLOCK_SIZE, lda-k);
-	/*Perform individual block dgemm*/
-        do_block(lda, M, N, K, AT + k + i*lda, B + k + j*lda, C + i + j*lda);
+  //Block size in 1D for L2 cache - BLOCK2 - for L1 cache - BLOCK 1 - 
+  register int BLOCK1 = 64;
+  register int BLOCK2 = 128;
+  
+  //This is for testing dgemm aglorithm outside do_block function
+  /*__m128d m0,m1,m2,m3;
+  for (int i = 0; i < lda; i += 8) {
+    for (int j = 0; j < lda; ++j) {
+      m0 = _mm_setzero_pd();  
+      for (int k = 0; k < lda; ++k) {
+	m1 = _mm_load_pd(A+i+lda*k);
+	m2 = _mm_load_pd(B+k+lda*j);
+	m3 = _mm_mul_pd(m1,m2);
+	m0 = _mm_add_pd(m0,m3);
       }
-  free(AT);
+      _mm_store_pd(C+i+lda*j,m0);
+    }
+  }*/
+  
+  //Proposed blocking method for 2 levels of memory - L1 and L2
+  for (int x = 0; x < lda; x += BLOCK2) {
+    int lim_k = x + min (BLOCK2,lda-x);
+    for (int y = 0; y < lda; y += BLOCK2) {
+      int lim_j = y + min (BLOCK2,lda-y);
+      for (int z = 0; z < lda; z += BLOCK2) {
+	int lim_i = z + min (BLOCK2,lda-z);
+        for (int k = x; k < lim_k; k += BLOCK1) {
+	  int K = min (BLOCK1,lim_k-k);
+	  for (int j = y; j < lim_j; j += BLOCK1) {
+	    int N = min (BLOCK1,lim_j-j);
+	    for (int i = z; i < lim_i; i += BLOCK1) {
+	      int M = min (BLOCK1,lim_i-i);
+	      //printf("M = %d\t, N = %d, K = %d \n",M,N,K); 
+              do_block(lda, M, N, K, A + i + k*lda, B + k + j*lda, C + i + j*lda);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  //Proposed blocking method for 1 level of memory - L1
+  /*for (int i = 0; i < lda; i += BLOCK1) {
+    for (int j = 0; j < lda; j += BLOCK1) {
+      for (int k = 0; k < lda; k += BLOCK1) {
+	int M = min (BLOCK1,lda-i);
+	int N = min (BLOCK1,lda-j);
+	int K = min (BLOCK1,lda-k);
+	do_block (lda, M, N, K, A + k + i*lda, B + k + j*lda, C + i + j*lda);
+      }
+    }
+  }*/
+
+  //This is to print out a small n*n C matrix (after calculation)
+  if (lda == 8) {
+    for (int i = 0; i < lda; ++i) {
+      for (int k = 0; k < lda; ++k) { 
+	printf("%g\t ",C[i+lda*k]);
+      }
+      printf("\n");
+    }
+  }
 }
