@@ -25,7 +25,7 @@ const char* dgemm_desc = "Simple blocked dgemm.";
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 
-#define ARRAY(A,i,j) (A)[(j)*lda + (i)]
+/*#define ARRAY(A,i,j) (A)[(j)*lda + (i)]
 
 static inline void calc_4x4(int lda, int K, double* a, double* b, double* c)
 {
@@ -81,7 +81,7 @@ static inline void calc_4x4(int lda, int K, double* a, double* b, double* c)
 }
 
 static inline void copy_a (int lda, const int K, double* a_src, double* a_dest) {
-  /* For each 4xK block-row of A */
+  //For each 4xK block-row of A
   for (int i = 0; i < K; ++i) 
   {
     *a_dest++ = *a_src;
@@ -106,13 +106,13 @@ static inline void copy_b (int lda, const int K, double* b_src, double* b_dest) 
     *b_dest++ = *b_ptr2++;
     *b_dest++ = *b_ptr3++;
   }
-}
+}*/
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
-  double A_block[M*K], B_block[K*N];
+  /*double A_block[M*K], B_block[K*N];
   double *a_ptr, *b_ptr, *c;
 
   const int Nmax = N-7;
@@ -122,13 +122,13 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
 
   int i = 0, j = 0, p = 0;
 
-  /* For each column of B */
+  // For each column of B
   for (j = 0 ; j < Nmax; j += 8) 
   {
     b_ptr = &B_block[j*K];
     // copy and transpose B_block
     copy_b(lda, K, B + j*lda, b_ptr);
-    /* For each row of A */
+    // For each row of A
     for (i = 0; i < Mmax; i += 8) {
       a_ptr = &A_block[i*K];
       if (j == 0) copy_a(lda, K, A + i, a_ptr);
@@ -137,15 +137,15 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
     }
   }
 
-  /* Handle "fringes" */
+  // Handle "fringes" 
   if (fringe1 != 0) 
   {
-    /* For each row of A */
+    // For each row of A
     for ( ; i < M; ++i)
-      /* For each column of B */ 
+      // For each column of B
       for (p = 0; p < N; ++p) 
       {
-        /* Compute C[i,j] */
+        // Compute C[i,j] 
         double c_ip = ARRAY(C,i,p);
         for (int k = 0; k < K; ++k)
           c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
@@ -155,22 +155,22 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
   if (fringe2 != 0) 
   {
     Mmax = M - fringe1;
-    /* For each column of B */
+    // For each column of B 
     for ( ; j < N; ++j)
-      /* For each row of A */ 
+      // For each row of A 
       for (i = 0; i < Mmax; ++i) 
       {
-        /* Compute C[i,j] */
+        // Compute C[i,j] 
         double cij = ARRAY(C,i,j);
         for (int k = 0; k < K; ++k)
           cij += ARRAY(A,i,k) * ARRAY(B,k,j);
         ARRAY(C,i,j) = cij;
       }
-  }
+  }*/
    // int edge1 = M % 4; int edge2 = M % 4;
   //Do math here
   //if (K % 4 == 0) {
-  /*__m256d m0,m1,m2,m3;
+  __m256d m0,m1,m2,m3;
   for (int i = 0; i < M; i += 4) {
     for (int j = 0; j < N; ++j) {
       m0 = _mm256_setzero_pd();  
@@ -186,7 +186,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
     }
   }
   //}
-  */
+  
   /*double m0,m1,m2,m3 = 0.0;
   for (int i = 0; i < M; ++i) {
     for (int j = 0; j < N; ++j) {
