@@ -25,8 +25,8 @@ const char* dgemm_desc = "Simple blocked dgemm.";
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 
-/*#define ARRAY(A,i,j) (A)[(j)*lda + (i)]
-
+#define ARRAY(A,i,j) (A)[(j)*lda + (i)]
+/*
 static inline void calc_4x4(int lda, int K, double* a, double* b, double* c)
 {
   __m256d a0x_1x, a2x_3x, 
@@ -170,7 +170,12 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
    // int edge1 = M % 4; int edge2 = M % 4;
   //Do math here
   //if (K % 4 == 0) {
+  if (M == N) {
   __m256d m0,m1,m2,m3;
+  //const int Nmax = N-3;
+  int Mmax = M-3;
+  int fringe1 = M%4;
+  int fringe2 = N%4;
   for (int i = 0; i < M; i += 4) {
     for (int j = 0; j < N; ++j) {
       m0 = _mm256_setzero_pd();  
@@ -185,51 +190,23 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
       _mm256_store_pd(C+i+j*lda,m0);
     }
   }
-  //}
+  }
   
-  /*double m0,m1,m2,m3 = 0.0;
-  for (int i = 0; i < M; ++i) {
-    for (int j = 0; j < N; ++j) {
-      m0 = C[i+j*lda];  
-      for (int k = 0; k < K; ++k) {
-	//printf("Can you see me here\n");
-	m1 = A[i+k*lda];
-	m2 = B[k+j*lda];
-	m3 = m1 * m2;
-	m0 = m0 + m3;
+  // Handle "fringes" 
+  if (M != N) 
+  {
+    // For each row of A
+    for (int i = 0 ; i < M; ++i)
+      // For each column of B
+      for (int p = 0; p < N; ++p) 
+      {
+        // Compute C[i,j] 
+        double c_ip = ARRAY(C,i,p);
+        for (int k = 0; k < K; ++k)
+          c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
+        ARRAY(C,i,p) = c_ip;
       }
-      C[i+j*lda] = m0;
-    }
-  }*/
-
-  /*if (edge1 != 0) {
-    for (int x = 0; x < M; ++x) {
-      for (int y = 0; y < N; ++y) {
-	m0 = C[x+y*lda];
-        for (int z = 0; z < K; ++z) {
-	  m1 = A[x+z*lda];
-	  m2 = B[z+y*lda];
-	  m3 = m1 * m2;
-	  m0 += m3;
-	}
-	C[x+lda*y] = m0;
-      }
-    }
-  }  
-  if (edge2 != 0) {
-    for (int x = 0; x < M; ++x) {
-      for (int y = 0; y < N; ++y) {
-	m0 = C[x+y*lda];
-        for (int z = 0; z < K; ++z) {
-	  m1 = A[x+z*lda];
-	  m2 = B[z+y*lda];
-	  m3 = m1 * m2;
-	  m0 += m3;
-	}
-	C[x+y*lda] = m0;
-      }
-    }
-  } */ 
+  } 
 }
 
 /* This routine performs a dgemm operation
