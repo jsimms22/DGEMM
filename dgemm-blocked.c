@@ -47,6 +47,8 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
 	  m3 = _mm256_mul_pd(m1,m2);
 	  m0 = _mm256_add_pd(m0,m3);
         }
+        m1 = __mm256_load_pd(C+i+j*lda);
+        m0 = __mm256_add_pd(m0,m1);
         _mm256_store_pd(C+i+j*lda,m0);
       }
     }
