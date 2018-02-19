@@ -33,44 +33,38 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
 {
   printf("K = %d\t,M = %d,N = %d, \n",K,M,N);
   //Do math here
-  //if (K % 4 == 0) {
-  if (M == N) {
-  __m256d m0,m1,m2,m3;
-  //const int Nmax = N-3;
-  //int Mmax = M-3;
-  //int fringe1 = M%4;
-  //int fringe2 = N%4;
-  for (int i = 0; i < M; i += 4) {
-    for (int j = 0; j < N; ++j) {
-      m0 = _mm256_setzero_pd();  
-      for (int k = 0; k < K; ++k) {
-	//if (lda = 96) printf("K = %d\t,M = %d,N = %d \n");
-	m1 = _mm256_load_pd(A+i+k*lda);
-	m2 = _mm256_broadcast_sd(B+k+j*lda); // should be m2 = _mm_broadcast_pd(B+k+lda*j), 
-				     // doesn't want to allow this implicit function
-	m3 = _mm256_mul_pd(m1,m2);
-	m0 = _mm256_add_pd(m0,m3);
+  int fringe1 = M % 4;
+  int fringe2 = N % 4;
+  int fringe3 = K % 4;
+  if (fringe1 == 0 && fringe2 == 0 && fringe3 == 0 && K == M && M == N && N == K) {
+    __m256d m0,m1,m2,m3;
+    for (int i = 0; i < M; i += 4) {
+      for (int j = 0; j < N; ++j) {
+        m0 = _mm256_setzero_pd();  
+        for (int k = 0; k < K; ++k) {
+	  m1 = _mm256_load_pd(A+i+k*lda);
+	  m2 = _mm256_broadcast_sd(B+k+j*lda);
+	  m3 = _mm256_mul_pd(m1,m2);
+	  m0 = _mm256_add_pd(m0,m3);
+        }
+        _mm256_store_pd(C+i+j*lda,m0);
       }
-      _mm256_store_pd(C+i+j*lda,m0);
+    }
+  } else {
+    // For each row of A
+    for (int i = 0 ; i < M; ++i) {
+      // For each column of B
+      for (int j = 0; j < N; ++j) {
+        // Compute C[i,j] 
+        double cij = 0.0;
+        for (int k = 0; k < K; ++k){
+          cij += A[i+k*lda] * B[k+j*lda];
+	}
+        C[i+j*lda] = cij;
+      }
     }
   }
-  }
-  
-  // Handle "fringes" 
-  else 
-  {
-    // For each row of A
-    for (int i = 0 ; i < M; ++i)
-      // For each column of B
-      for (int p = 0; p < N; ++p) 
-      {
-        // Compute C[i,j] 
-        double c_ip = ARRAY(C,i,p);
-        for (int k = 0; k < K; ++k)
-          c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
-        ARRAY(C,i,p) = c_ip;
-      }
-  } 
+  printf("exiting a block\n"); 
 }
 
 /* This routine performs a dgemm operation
@@ -108,7 +102,8 @@ void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
 	    int N = min (BLOCK1,lim_j-j);
 	    for (int i = z; i < lim_i; i += BLOCK1) {
 	      int M = min (BLOCK1,lim_i-i);
-	      //if (lda == 96) printf("M = %d\t, N = %d, K = %d \n",M,N,K); 
+	      printf("M = %d\t, N = %d, K = %d \n",M,N,K);
+	      //printf("i = %d\t, j = %d, k = %d \n",i,j,k); 
               do_block(lda, M, N, K, A + i + k*lda, B + k + j*lda, C + i + j*lda);
             }
           }
@@ -127,4 +122,5 @@ void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
       printf("\n");
     }
   }*/
+  printf("\n");
 }
