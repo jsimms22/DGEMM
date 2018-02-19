@@ -31,9 +31,10 @@ const char* dgemm_desc = "Simple blocked dgemm.";
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
+  printf("K = %d\t,M = %d,N = %d, \n",K,M,N);
   //Do math here
   //if (K % 4 == 0) {
-  if (M == N && M==K && K==N) {
+  if (M == N) {
   __m256d m0,m1,m2,m3;
   //const int Nmax = N-3;
   //int Mmax = M-3;
@@ -43,7 +44,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
     for (int j = 0; j < N; ++j) {
       m0 = _mm256_setzero_pd();  
       for (int k = 0; k < K; ++k) {
-	//printf("Can you see me here\n");
+	//if (lda = 96) printf("K = %d\t,M = %d,N = %d \n");
 	m1 = _mm256_load_pd(A+i+k*lda);
 	m2 = _mm256_broadcast_sd(B+k+j*lda); // should be m2 = _mm_broadcast_pd(B+k+lda*j), 
 				     // doesn't want to allow this implicit function
@@ -78,7 +79,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
  * On exit, A and B maintain their input values. */
 void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
 {
-  //printf("Do you see me now %d\t",lda);
+  printf("Do you see me now at %d\t \n",lda);
   //This is to print out a small n*n C matrix (before calculation)
   /*if (lda == 8) {
     for (int i = 0; i < lda; ++i) {
@@ -107,7 +108,7 @@ void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
 	    int N = min (BLOCK1,lim_j-j);
 	    for (int i = z; i < lim_i; i += BLOCK1) {
 	      int M = min (BLOCK1,lim_i-i);
-	      //printf("M = %d\t, N = %d, K = %d \n",M,N,K); 
+	      //if (lda == 96) printf("M = %d\t, N = %d, K = %d \n",M,N,K); 
               do_block(lda, M, N, K, A + i + k*lda, B + k + j*lda, C + i + j*lda);
             }
           }
