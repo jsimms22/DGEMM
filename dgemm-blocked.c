@@ -22,22 +22,26 @@
 const char* dgemm_desc = "Simple blocked dgemm.";
 
 #define min(a,b) (((a)<(b))?(a):(b))
-#define likely(x)       __builtin_expect((x),1)
-#define unlikely(x)     __builtin_expect((x),0)
+//#define likely(x)       __builtin_expect((x),1)
+//#define unlikely(x)     __builtin_expect((x),0)
 
-#define ARRAY(A,i,j) (A)[(j)*lda + (i)]
+//#define ARRAY(A,i,j) (A)[(j)*lda + (i)]
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
-  printf("K = %d\t,M = %d,N = %d, \n",K,M,N);
+  //printf("M = %d\t,N = %d,K = %d, \n",M,N,K);
   //Do math here
+  //printf("Did it declare?");
   int fringe1 = M % 4;
   int fringe2 = N % 4;
   int fringe3 = K % 4;
+  //printf("Did it declare?");
   if (fringe1 == 0 && fringe2 == 0 && fringe3 == 0 && K == M && M == N && N == K) {
+    //printf("Did it declare?");
     __m256d m0,m1,m2,m3;
+    //printf("Did it declare?");
     for (int i = 0; i < M; i += 4) {
       for (int j = 0; j < N; ++j) {
         m0 = _mm256_setzero_pd();  
@@ -47,12 +51,13 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
 	  m3 = _mm256_mul_pd(m1,m2);
 	  m0 = _mm256_add_pd(m0,m3);
         }
-        m1 = __mm256_load_pd(C+i+j*lda);
-        m0 = __mm256_add_pd(m0,m1);
+        m1 = _mm256_load_pd(C+i+j*lda);
+        m0 = _mm256_add_pd(m0,m1);
         _mm256_store_pd(C+i+j*lda,m0);
       }
     }
   } else {
+    //printf("Did it do else?");
     // For each row of A
     for (int i = 0 ; i < M; ++i) {
       // For each column of B
@@ -62,7 +67,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
         for (int k = 0; k < K; ++k){
           cij += A[i+k*lda] * B[k+j*lda];
 	}
-        C[i+j*lda] = cij;
+        C[i+j*lda] += cij;
       }
     }
   }
