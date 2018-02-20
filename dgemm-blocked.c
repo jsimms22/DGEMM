@@ -31,14 +31,14 @@ const char* dgemm_desc = "Simple blocked dgemm.";
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
-  //printf("M = %d\t,N = %d,K = %d, \n",M,N,K);
+  printf("M = %d\t,N = %d,K = %d, \n",M,N,K);
   //Do math here
   //printf("Did it declare?");
-  //int fringe1 = M % 4;
-  //int fringe2 = N % 4;
-  //int fringe3 = K % 4;
+  int fringe1 = M % 4;
+  int fringe2 = N % 4;
+  int fringe3 = K % 4;
   //printf("Did it declare?");
-  if (/*fringe1 == 0 && fringe2 == 0 && fringe3 == 0 &&*/ K == M && M == N && N == K) {
+  if (fringe1 == 0 && fringe2 == 0 && fringe3 == 0 && K == M && M == N && N == K) {
     //printf("Did it declare?");
     __m256d m0,m1,m2,m3;
     //printf("Did it declare?");
@@ -71,7 +71,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
       }
     }
   }
-  //printf("exiting a block\n"); 
+  printf("exiting a block\n"); 
 }
 
 /* This routine performs a dgemm operation
@@ -80,7 +80,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
  * On exit, A and B maintain their input values. */
 void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
 {
-  //printf("Do you see me now at %d\t \n",lda);
+  printf("Do you see me now at %d\t \n",lda);
   //This is to print out a small n*n C matrix (before calculation)
   /*if (lda == 8) {
     for (int i = 0; i < lda; ++i) {
