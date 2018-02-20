@@ -117,7 +117,7 @@ for (int iii = 5;iii < 200;++iii){
     /* Time a "sufficiently long" sequence of calls to reduce noise */
     double Gflops_s, seconds = -1.0;
     double timeout = 0.1; // "sufficiently long" := at least 1/10 second.
-    /*for (int n_iterations = 1; seconds < timeout; n_iterations *= 2) 
+    for (int n_iterations = 1; seconds < timeout; n_iterations *= 2) 
     {
       //Warm-up 
       square_dgemm (n, A, B, C);
@@ -130,13 +130,13 @@ for (int iii = 5;iii < 200;++iii){
 
      //  compute Gflop/s rate
       Gflops_s = 2.e-9 * n_iterations * n * n * n / seconds;
-    }*/
+    }
   
     /* Storing Mflop rate and calculating percentage of peak */
-//    Mflops_s[isize] = Gflops_s*1000;
-//    per[isize] = Gflops_s*100/MAX_SPEED;
+    Mflops_s[isize] = Gflops_s*1000;
+    per[isize] = Gflops_s*100/MAX_SPEED;
 
-//    printf ("Size: %d\tMflop/s: %8g\tPercentage:%6.2lf\n", n, Mflops_s[isize],per[isize]);
+    printf ("Size: %d\tMflop/s: %8g\tPercentage:%6.2lf\n", n, Mflops_s[isize],per[isize]);
 
     /* Ensure that error does not exceed the theoretical error bound. */
 
@@ -160,30 +160,30 @@ for (int iii = 5;iii < 200;++iii){
     /* If any element in C is positive, then something went wrong in square_dgemm */
     for (int i = 0; i < n * n; ++i)
       if (C[i] > 0)
-	die("*** FAILURE *** Error in matrix multiply exceeds componentwise error bounds.\n" );
-  }
+	die("*** FAILURE *** Error in matrix multiply exceeds componentwise error bounds.\n" );  
+}
 
   /* Calculating average percentage of peak reached by algorithm */
-//  aveper=0;
-//  for (int i=0; i<nsizes;i++)
-//    aveper+= per[i];
-//  aveper/=nsizes*1.0;
+  aveper=0;
+  for (int i=0; i<nsizes;i++)
+    aveper+= per[i];
+  aveper/=nsizes*1.0;
   
   /* Assigning grade based on average percentage reached (50% gets 75; 80% gets 100; rest distributed proportionally) */
-//  if (aveper > 80) grade = 100.0;
-//  else if (aveper > 50) grade = (aveper-50)*0.25*100.0/30.0 + 75.0;
-//  else
-//     grade = aveper * 2 * 0.75;
+  if (aveper > 80) grade = 100.0;
+  else if (aveper > 50) grade = (aveper-50)*0.25*100.0/30.0 + 75.0;
+  else
+     grade = aveper * 2 * 0.75;
 
   /* Printing average percentage and grade to screen */
-//  printf("Average percentage of Peak = %g\nGrade = %g\n",aveper,grade);  
-//  free (buf);
-/*if (highestGrade < grade){
-	highestGrade = grade;
-	highBlock = iii;
-  }
-printf("Finished block size: %d\t",iii);
-}
-printf("%d\t",highBlock);*/
+  printf("Average percentage of Peak = %g\nGrade = %g\n",aveper,grade);  
+  free (buf);
+//if (highestGrade < grade){
+//	highestGrade = grade;
+//	highBlock = iii;
+//  }
+//printf("Finished block size: %d\t",iii);
+//}
+//printf("%d\t",highBlock);
   return 0;
 }
