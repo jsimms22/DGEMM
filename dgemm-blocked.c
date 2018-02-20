@@ -40,7 +40,7 @@ static inline void do_avx (int lda, int M, int N, int K, double* a, double* b, d
         }
         m1 = _mm256_load_pd(c+i+j*lda);
         m0 = _mm256_add_pd(m0,m1);
-        _mm256_store_pd(c+i+j*lda,m0);
+        _mm256_storeu_pd(c+i+j*lda,m0);
       }
     }
 }
