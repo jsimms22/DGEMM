@@ -25,7 +25,7 @@ const char* dgemm_desc = "Simple blocked dgemm.";
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 
-static inline void do_avx (int lda, int M, int N, int K, double* a, double* b, double* c) {
+static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it declare?");
     __m256d m0,m1,m2,m3;
     //printf("Did it declare?");
@@ -44,15 +44,33 @@ static inline void do_avx (int lda, int M, int N, int K, double* a, double* b, d
       }
     }
 }
+//huge memory leak
+/*static void do_avx128 (int lda, int M, int N, int K, double* a, double* b, double* c) {
+  __m128d m0,m1,m2,m3;
+  for (int i = 0; i < M; i += 2) {
+    for (int j = 0; j < N; ++j) {
+      m0 = _mm_setzero_pd();  
+      for (int k = 0; k < K; ++k) {
+        m1 = _mm_load_pd(a+i+k*lda);
+	m2 = _mm_set_pd(*(b+k+1+j*lda),*(b+k+j*lda));
+	m3 = _mm_mul_pd(m1,m2);
+	m0 = _mm_add_pd(m0,m3);
+      }
+      m1 = _mm_load_pd(c+i+j*lda);
+      m0 = _mm_add_pd(m0,m1);
+      _mm_storeu_pd(c+i+j*lda,m0);
+    }
+  }
+}*/
 
 static inline void do_simple (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it do else?");
     // For each row of A
-    for (int i = 0 ; i < M; ++i) {
+    for (int i = 0; i < M; ++i) {
       // For each column of B
       for (int j = 0; j < N; ++j) {
         // Compute C[i,j] 
-        double cij = 0.0;
+        register double cij = 0.0;
         for (int k = 0; k < K; ++k){
           cij += a[i+k*lda] * b[k+j*lda];
 	}
@@ -63,16 +81,37 @@ static inline void do_simple (int lda, int M, int N, int K, double* a, double* b
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
-static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
+static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
   //printf("M = %d\t,N = %d,K = %d, \n",M,N,K);
   //printf("Did it declare?");
-  int fringe1 = M % 4;
-  int fringe2 = N % 4;
-  int fringe3 = K % 4;
+  register char status;
+  if (M == N) {
+    if (K == N) {
+      if (M == K) { 
+        if (M%4 == 0) {
+	  if (N%4 == 0) {
+	    if (K%4 == 0) {
+	      status = '0';
+	    }
+	  }
+	} else if (M%2 == 0) {
+	    if (N%2 == 0) {
+	      if (K%2 == 0) {
+		status = '1';
+	      }
+	    }
+	  } else {
+	  status = '2';
+	}
+      }
+    }
+  }
   //printf("Did it declare?");
-  if (fringe1 == 0 && fringe2 == 0 && fringe3 == 0 && K == M && M == N && N == K) {
-    do_avx (lda, M, N, K, A, B, C);
+  if (status == '0') {
+    do_avx256 (lda, M, N, K, A, B, C);
+  } else if (status == '1') {
+    do_simple (lda, M, N, K, A, B, C);
   } else {
     do_simple (lda, M, N, K, A, B, C);
   }
