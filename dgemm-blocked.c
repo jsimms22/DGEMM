@@ -24,6 +24,59 @@ const char* dgemm_desc = "Simple blocked dgemm.";
 #define min(a,b) (((a)<(b))?(a):(b))
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
+/*//Works, but not fast
+static void do_avx_unrolled (int lda, int M, int N, int K, double* a, double* b, double* c) {
+  register __m128d cTmp, aTmp, bTmp;
+  for (int j = 0; j < N; ++j) {
+    for (int k = 0; k < K; ++k) {
+      bTmp = _mm_load1_pd(b + k + j*lda);
+      double* adda_mid = a + k*lda;
+      double* addc_mid = c + j*lda;
+      for (int i = 0; i < M/8*8; i += 8) {
+        double* adda = adda_mid + i;
+        double* addc = addc_mid + i;
+        
+	aTmp = _mm_loadu_pd(adda);
+	cTmp = _mm_loadu_pd(addc);
+	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
+	_mm_storeu_pd(addc, cTmp);
+	
+	aTmp = _mm_loadu_pd(adda + 2);
+	cTmp = _mm_loadu_pd(addc + 2);
+	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
+	_mm_storeu_pd((addc + 2), cTmp);
+
+	aTmp = _mm_loadu_pd(adda + 4);
+	cTmp = _mm_loadu_pd(addc + 4);
+	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
+	_mm_storeu_pd((addc + 4), cTmp);
+
+	aTmp = _mm_loadu_pd(adda + 6);
+	cTmp = _mm_loadu_pd(addc + 6);
+	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
+	_mm_storeu_pd((addc + 6), cTmp);
+      }
+
+      for (int i = M/8*8; i < M/2*2; i += 2) {
+        double* adda = adda_mid + i;
+        double* addc = addc_mid + i;
+        
+	aTmp = _mm_loadu_pd(adda);
+	cTmp = _mm_loadu_pd(addc);
+	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
+	_mm_storeu_pd(addc, cTmp);
+      }
+
+      for (int i = M/2*2; i < M; ++i) {
+        c[i + j*lda] += a[i + k*lda] * b[k + j*lda];
+      }
+    }
+  }
+}*/
+
+static void do_avx256_unrolled (int lda, int M, int N, int K, double* a, double* b, double* c) {
+  
+}
 
 static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it declare?");
@@ -44,24 +97,6 @@ static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, doubl
       }
     }
 }
-//huge memory leak
-/*static void do_avx128 (int lda, int M, int N, int K, double* a, double* b, double* c) {
-  __m128d m0,m1,m2,m3;
-  for (int i = 0; i < M; i += 2) {
-    for (int j = 0; j < N; ++j) {
-      m0 = _mm_setzero_pd();  
-      for (int k = 0; k < K; ++k) {
-        m1 = _mm_load_pd(a+i+k*lda);
-	m2 = _mm_set_pd(*(b+k+1+j*lda),*(b+k+j*lda));
-	m3 = _mm_mul_pd(m1,m2);
-	m0 = _mm_add_pd(m0,m3);
-      }
-      m1 = _mm_load_pd(c+i+j*lda);
-      m0 = _mm_add_pd(m0,m1);
-      _mm_storeu_pd(c+i+j*lda,m0);
-    }
-  }
-}*/
 
 static inline void do_simple (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it do else?");
@@ -115,7 +150,10 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
   } else {
     do_simple (lda, M, N, K, A, B, C);
   }
-  //printf("exiting a block\n"); 
+  //printf("exiting a block\n");
+ 
+  //Does not run fast
+  //do_avx_unrolled (lda, M, N, K, A, B, C);
 }
 /* This routine performs a dgemm operation
  *  C := C + A * B
