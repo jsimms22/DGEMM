@@ -207,7 +207,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
   int fringe2 = N%4;
   
   int i = 0, j = 0, p = 0;
-
+    
   for (j = 0; j < Nmax; j += 4) {
     b_ptr = &B_block[j*K];
     copy_b (lda, K, B + j*lda, b_ptr);
@@ -293,8 +293,8 @@ void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
 {
   //printf("Do you see me now at %d\t \n",lda);
   //Block size in 1D for L2 cache - BLOCK2 - for L1 cache - BLOCK 1 - 
-  int BLOCK1 = 32;
-  int BLOCK2 = 64;
+  int BLOCK1 = 256;
+  int BLOCK2 = 512;
   //Proposed blocking method for 2 levels of memory - L1 and L2
   for (int x = 0; x < lda; x += BLOCK2) {
     int lim_k = x + min (BLOCK2,lda-x);
