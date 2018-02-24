@@ -170,10 +170,10 @@ for (int iii = 5;iii < 200;++iii){
   aveper/=nsizes*1.0;
   
   // Assigning grade based on average percentage reached (50% gets 75; 80% gets 100; rest distributed proportionally) */
-  if (aveper > 80) grade = 100.0;
-  else if (aveper > 50) grade = (aveper-50)*0.25*100.0/30.0 + 75.0;
+  if (aveper > 43) grade = 100.0;
+  else if (aveper > 25) grade = (aveper-25)*0.25*100.0/30.0 + 75.0;
   else
-     grade = aveper * 2 * 0.75;
+     grade = aveper * 4 * 0.75;
 
   // Printing average percentage and grade to screen
   printf("Average percentage of Peak = %g\nGrade = %g\n",aveper,grade); 
