@@ -85,6 +85,7 @@ static void do_avx_unrolled (int lda, int M, int N, int K, double* a, double* b,
  */
 
 static void do_avx256_unrolled (int lda, int K, double* a, double* b, double* c) {
+  //printf("Can you see me");
   __m256d a0x_3x, /*a4x_7x,*/
     bx0, bx1, bx2, bx3,/* bx4, bx5, bx6, bx7*/
     c00_30, /*c40_70,*/
@@ -92,13 +93,17 @@ static void do_avx256_unrolled (int lda, int K, double* a, double* b, double* c)
     c02_32, /*c42_72,*/
     c03_33/*, c43_73*/;
   
+  double* c01_31_ptr = c + lda;
+  double* c02_32_ptr = c01_31_ptr + lda;
+  double* c03_33_ptr = c02_32_ptr + lda;
+  
   c00_30 = _mm256_loadu_pd(c);
   //c40_70 = _mm256_loadu_pd(c + 4);
-  c01_31 = _mm256_loadu_pd(c + lda);
+  c01_31 = _mm256_loadu_pd(c01_31_ptr);
   //c41_71 = _mm256_loadu_pd(c + lda + 4);
-  c02_32 = _mm256_loadu_pd(c + 2*lda);
+  c02_32 = _mm256_loadu_pd(c02_32_ptr);
   //c42_72 = _mm256_loadu_pd(c + 2*lda + 4);
-  c03_33 = _mm256_loadu_pd(c + 3*lda);
+  c03_33 = _mm256_loadu_pd(c03_33_ptr);
   //c43_73 = _mm256_loadu_pd(c + 3*lda + 4);
   
   for (int x = 0; x < K; ++x) {
@@ -122,17 +127,17 @@ static void do_avx256_unrolled (int lda, int K, double* a, double* b, double* c)
   }
   
   _mm256_storeu_pd(c,c00_30);
-  _mm256_storeu_pd(c+lda,c01_31);
-  _mm256_storeu_pd(c+2*lda,c02_32);
-  _mm256_storeu_pd(c+3*lda,c03_33);
+  _mm256_storeu_pd(c01_31_ptr,c01_31);
+  _mm256_storeu_pd(c02_32_ptr,c02_32);
+  _mm256_storeu_pd(c03_33_ptr,c03_33);
 }
 
 static inline void copy_a (int lda, const int K, double* a_src, double* a_dest) {
   for (int i = 0; i < K; ++i) {
     *a_dest++ = *a_src;
-    *a_dest++ = (*a_src + 1);
-    *a_dest++ = (*a_src + 2);
-    *a_dest++ = (*a_src + 3);
+    *a_dest++ = *(a_src + 1);
+    *a_dest++ = *(a_src + 2);
+    *a_dest++ = *(a_src + 3);
     a_src += lda;
   }
 }
@@ -151,35 +156,6 @@ static inline void copy_b (int lda, const int K, double* b_src, double* b_dest) 
     *b_dest++ = *b_ptr3++;
   }
 }
-
-/*static void do_4x4 (int lda, int M, int N, int K, double*A, double* B, double* C) {
-  double A_block[M*K], B_block[K*N];
-  double *a_ptr, *b_ptr, *c;
-
-  const int Nmax = N-3;
-  int Mmax = M-3;
-  int fringe1 = M%4;
-  int fringe2 = N%4;
-
-  for (int j = 0; j < Nmax; j += 4) {
-    b_ptr = &B_block[j*K];
-    copy_b(lda, K, B+j*lda, b_ptr);
-    for (int i = 0; i < Mmax; i += 4) {
-      a_ptr = &A_block[i*K];
-      if (j == 0) copy_a(lda, K, A+i, a_ptr);
-      c = C + i + j*lda;
-      do_avx256_unrolled (lda, K, a_ptr, b_ptr, c);
-    }
-  }
-
-  if (fringe1 != 0) {
-    do_simple (lda, M, N, K, A, B, C);
-  }
-  if (fringe2 != 0) {
-    Mmax = M - fringe1;
-    do_simple (lda, Mmax, N, K, A, B, C);
-  }
-}*/
 
 static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it declare?");
@@ -219,8 +195,9 @@ static inline void do_simple (int lda, int M, int N, int K, double* a, double* b
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
-static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
+static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
+  //printf("Did it enter do_block?\n");
   double A_block[M*K], B_block[K*N];
   double *a_ptr, *b_ptr, *c;
 
@@ -228,24 +205,43 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
   int Mmax = M-3;
   int fringe1 = M%4;
   int fringe2 = N%4;
+  
+  int i = 0, j = 0, p = 0;
 
-  for (int j = 0; j < Nmax; j += 4) {
+  for (j = 0; j < Nmax; j += 4) {
     b_ptr = &B_block[j*K];
-    copy_b(lda, K, B+j*lda, b_ptr);
-    for (int i = 0; i < Mmax; i += 4) {
+    copy_b (lda, K, B + j*lda, b_ptr);
+    for (i = 0; i < Mmax; i += 4) {
+      //printf("j = %d\t, i = %d \n",j,i);
       a_ptr = &A_block[i*K];
-      if (j == 0) copy_a(lda, K, A+i, a_ptr);
+      if (j == 0) copy_a (lda, K, A + i, a_ptr);
       c = C + i + j*lda;
       do_avx256_unrolled (lda, K, a_ptr, b_ptr, c);
     }
   }
 
   if (fringe1 != 0) {
-    do_simple (lda, M, N, K, A, B, C);
+    for ( ; i < M; ++i) {
+      for (p = 0; p < N; ++p) {
+        double c_ip = C[i + p*lda];
+        for (int k = 0; k < K; ++k) {
+	  c_ip += A[i+k*lda] * B[k+j*lda];
+        }
+	C[i+p*lda] = c_ip;
+      }
+    }  
   }
   if (fringe2 != 0) {
     Mmax = M - fringe1;
-    do_simple (lda, Mmax, N, K, A, B, C);
+    for ( ; j < N; ++j) {
+      for (i = 0; i < Mmax; ++i) {
+        double c_ij = C[i + j*lda];
+        for (int k = 0; k < K; ++k) {
+	  c_ij += A[i+k*lda] * B[k+j*lda];
+        }
+	C[i+j*lda] = c_ij;
+      }
+    }   
   }
 
   //printf("M = %d\t,N = %d,K = %d, \n",M,N,K);
