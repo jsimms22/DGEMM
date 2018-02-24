@@ -73,10 +73,113 @@ static void do_avx_unrolled (int lda, int M, int N, int K, double* a, double* b,
     }
   }
 }*/
+ /*C Matrix 8x8			A Matrix   B Matrix
+ * | 00 10 20 30 40 50 60 70 |  | 0x -> |  | 0x 1x 2x 3x 4x 5x 6x 7x |
+ * | 01 11 21 31 41 51 61 71 |  | 1x -> |  |                         |
+ * | 02 12 22 32 42 52 62 72 |  | 2x -> |  |                         |
+ * | 03 13 23 33 43 53 63 73 |  | 3x -> |  |                         |
+ * | 04 14 24 34 44 54 64 74 |  | 4x -> |  |                         |
+ * | 05 15 25 35 45 55 65 75 |  | 5x -> |  |                         |
+ * | 06 16 26 36 46 56 66 76 |  | 6x -> |  |                         |
+ * | 07 17 27 37 47 57 67 77 |  | 7x -> |  |                         |
+ */
 
-static void do_avx256_unrolled (int lda, int M, int N, int K, double* a, double* b, double* c) {
+static void do_avx256_unrolled (int lda, int K, double* a, double* b, double* c) {
+  __m256d a0x_3x, /*a4x_7x,*/
+    bx0, bx1, bx2, bx3,/* bx4, bx5, bx6, bx7*/
+    c00_30, /*c40_70,*/
+    c01_31, /*c41_71,*/
+    c02_32, /*c42_72,*/
+    c03_33/*, c43_73*/;
   
+  c00_30 = _mm256_loadu_pd(c);
+  //c40_70 = _mm256_loadu_pd(c + 4);
+  c01_31 = _mm256_loadu_pd(c + lda);
+  //c41_71 = _mm256_loadu_pd(c + lda + 4);
+  c02_32 = _mm256_loadu_pd(c + 2*lda);
+  //c42_72 = _mm256_loadu_pd(c + 2*lda + 4);
+  c03_33 = _mm256_loadu_pd(c + 3*lda);
+  //c43_73 = _mm256_loadu_pd(c + 3*lda + 4);
+  
+  for (int x = 0; x < K; ++x) {
+    a0x_3x = _mm256_load_pd(a);
+    //a4x_7x = _mm256_load_pd(a+4);
+    a += 4;
+
+    bx0 = _mm256_broadcast_sd(b++);
+    bx1 = _mm256_broadcast_sd(b++);
+    bx2 = _mm256_broadcast_sd(b++);
+    bx3 = _mm256_broadcast_sd(b++);
+    //bx4 = _mm256_broadcast_sd(b++);
+    //bx5 = _mm256_broadcast_sd(b++);
+    //bx6 = _mm256_broadcast_sd(b++);
+    //bx7 = _mm256_broadcast_sd(b++);
+
+    c00_30 = _mm256_add_pd(c00_30, _mm256_mul_pd(a0x_3x,bx0));
+    c01_31 = _mm256_add_pd(c01_31, _mm256_mul_pd(a0x_3x,bx1));
+    c02_32 = _mm256_add_pd(c02_32, _mm256_mul_pd(a0x_3x,bx2));
+    c03_33 = _mm256_add_pd(c03_33, _mm256_mul_pd(a0x_3x,bx3));
+  }
+  
+  _mm256_storeu_pd(c,c00_30);
+  _mm256_storeu_pd(c+lda,c01_31);
+  _mm256_storeu_pd(c+2*lda,c02_32);
+  _mm256_storeu_pd(c+3*lda,c03_33);
 }
+
+static inline void copy_a (int lda, const int K, double* a_src, double* a_dest) {
+  for (int i = 0; i < K; ++i) {
+    *a_dest++ = *a_src;
+    *a_dest++ = (*a_src + 1);
+    *a_dest++ = (*a_src + 2);
+    *a_dest++ = (*a_src + 3);
+    a_src += lda;
+  }
+}
+
+static inline void copy_b (int lda, const int K, double* b_src, double* b_dest) {
+  double *b_ptr0, *b_ptr1, *b_ptr2, *b_ptr3;
+  b_ptr0 = b_src;
+  b_ptr1 = b_ptr0 + lda;
+  b_ptr2 = b_ptr1 + lda;
+  b_ptr3 = b_ptr2 + lda;
+
+  for (int i = 0; i < K; ++i) {
+    *b_dest++ = *b_ptr0++;
+    *b_dest++ = *b_ptr1++;
+    *b_dest++ = *b_ptr2++;
+    *b_dest++ = *b_ptr3++;
+  }
+}
+
+/*static void do_4x4 (int lda, int M, int N, int K, double*A, double* B, double* C) {
+  double A_block[M*K], B_block[K*N];
+  double *a_ptr, *b_ptr, *c;
+
+  const int Nmax = N-3;
+  int Mmax = M-3;
+  int fringe1 = M%4;
+  int fringe2 = N%4;
+
+  for (int j = 0; j < Nmax; j += 4) {
+    b_ptr = &B_block[j*K];
+    copy_b(lda, K, B+j*lda, b_ptr);
+    for (int i = 0; i < Mmax; i += 4) {
+      a_ptr = &A_block[i*K];
+      if (j == 0) copy_a(lda, K, A+i, a_ptr);
+      c = C + i + j*lda;
+      do_avx256_unrolled (lda, K, a_ptr, b_ptr, c);
+    }
+  }
+
+  if (fringe1 != 0) {
+    do_simple (lda, M, N, K, A, B, C);
+  }
+  if (fringe2 != 0) {
+    Mmax = M - fringe1;
+    do_simple (lda, Mmax, N, K, A, B, C);
+  }
+}*/
 
 static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it declare?");
@@ -118,9 +221,37 @@ static inline void do_simple (int lda, int M, int N, int K, double* a, double* b
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
+  double A_block[M*K], B_block[K*N];
+  double *a_ptr, *b_ptr, *c;
+
+  const int Nmax = N-3;
+  int Mmax = M-3;
+  int fringe1 = M%4;
+  int fringe2 = N%4;
+
+  for (int j = 0; j < Nmax; j += 4) {
+    b_ptr = &B_block[j*K];
+    copy_b(lda, K, B+j*lda, b_ptr);
+    for (int i = 0; i < Mmax; i += 4) {
+      a_ptr = &A_block[i*K];
+      if (j == 0) copy_a(lda, K, A+i, a_ptr);
+      c = C + i + j*lda;
+      do_avx256_unrolled (lda, K, a_ptr, b_ptr, c);
+    }
+  }
+
+  if (fringe1 != 0) {
+    do_simple (lda, M, N, K, A, B, C);
+  }
+  if (fringe2 != 0) {
+    Mmax = M - fringe1;
+    do_simple (lda, Mmax, N, K, A, B, C);
+  }
+
   //printf("M = %d\t,N = %d,K = %d, \n",M,N,K);
   //printf("Did it declare?");
-  register char status;
+
+  /*register char status;
   if (M == N) {
     if (K == N) {
       if (M == K) { 
@@ -142,14 +273,17 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
       }
     }
   }
+
   //printf("Did it declare?");
+
   if (status == '0') {
     do_avx256 (lda, M, N, K, A, B, C);
   } else if (status == '1') {
     do_simple (lda, M, N, K, A, B, C);
   } else {
     do_simple (lda, M, N, K, A, B, C);
-  }
+  }*/
+
   //printf("exiting a block\n");
  
   //Does not run fast
