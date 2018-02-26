@@ -19,7 +19,7 @@
 #include <pmmintrin.h>
 #include <xmmintrin.h>
 #include <emmintrin.h>
-const char* dgemm_desc = "Simple blocked dgemm.";
+const char* dgemm_desc = "Tuned blocked dgemm.";
 
 #define min(a,b) (((a)<(b))?(a):(b))
 
@@ -163,6 +163,12 @@ static inline void copy_b8 (int lda, const int K, double* b_src, double* b_dest)
   }
 }*/
 
+ /*C Matrix 4x4     A Matrix   B Matrix
+ * | 00 10 20 30 |  | 0x -> |  | 0x 1x 2x 3x |
+ * | 01 11 21 31 |  | 1x -> |  |             |
+ * | 02 12 22 32 |  | 2x -> |  |             |
+ * | 03 13 23 33 |  | 3x -> |  |             |
+ */
 static void do_4x4 (int lda, int K, double* a, double* b, double* c) {
   register __m256d a0x_3x,
     bx0, bx1, bx2, bx3,
@@ -224,6 +230,55 @@ static inline void copy_b4 (int lda, const int K, double* b_src, double* b_dest)
   }
 }
 
+ /*C Matrix 2x2 A Matrix   B Matrix
+ * | 00 10 |  | 0x -> |  | 0x 1x |
+ * | 01 11 |  | 1x -> |  |       |
+ */
+/*static void do_2x2 (int lda, int K, double* a, double* b, double* c) {
+  register __m128d a0x_1x,
+    bx0, bx1,
+    c00_10,
+    c01_11;
+  
+  double* c01_11_ptr = c + lda;
+  
+  c00_10 = _mm_loadu_pd(c);
+  c01_11 = _mm_loadu_pd(c01_11_ptr);
+  
+  for (int x = 0; x < K; ++x) {
+    a0x_1x = _mm_load_pd(a);
+    a += 2;
+
+    bx0 = _mm_loaddup_pd(b++);
+    bx1 = _mm_loaddup_pd(b++);
+
+    c00_10 = _mm_add_pd(c00_10, _mm_mul_pd(a0x_1x,bx0));
+    c01_11 = _mm_add_pd(c01_11, _mm_mul_pd(a0x_1x,bx1));
+  }
+  
+  _mm_storeu_pd(c,c00_10);
+  _mm_storeu_pd(c01_11_ptr,c01_11);
+}
+
+static inline void copy_a2 (int lda, const int K, double* a_src, double* a_dest) {
+  for (int i = 0; i < K; ++i) {
+    *a_dest++ = *a_src;
+    *a_dest++ = *(a_src + 1);
+    a_src += lda;
+  }
+}
+
+static inline void copy_b2 (int lda, const int K, double* b_src, double* b_dest) {
+  double *b_ptr0, *b_ptr1;
+  b_ptr0 = b_src;
+  b_ptr1 = b_ptr0 + lda;
+
+  for (int i = 0; i < K; ++i) {
+    *b_dest++ = *b_ptr0++;
+    *b_dest++ = *b_ptr1++;
+  }
+}
+*/
 /*static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it declare?");
     __m256d m0,m1,m2,m3;
@@ -311,8 +366,10 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
 	  C[i+j*lda] = c_ij;
         }
       }   
-    }*/
+    }
+*/
 
+ /* 4x4 blocks */
   int Nmax = N-3;
   int Mmax = M-3;
   int fringe1 = M%4;
@@ -355,6 +412,51 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
       }
     }   
   }
+
+ /* 2x2 blocks */
+/*  int Nmax = N-1;
+  int Mmax = M-1;
+  int fringe1 = M%2;
+  int fringe2 = N%2;
+  
+  int i = 0, j = 0, p = 0;
+  
+  for (j = 0; j < Nmax; j += 2) {
+    b_ptr = &B_block[j*K];
+    copy_b2 (lda, K, B + j*lda, b_ptr);
+    for (i = 0; i < Mmax; i += 2) {
+      a_ptr = &A_block[i*K];
+      if (j == 0) copy_a2 (lda, K, A + i, a_ptr);
+      c = C + i + j*lda;
+      do_2x2 (lda, K, a_ptr, b_ptr, c);
+    }
+  }
+
+  if (fringe1 != 0) {
+    for ( ; i < M; ++i) {
+      for (p = 0; p < N; ++p) {
+        double c_ip = C[i + p*lda];
+        for (int k = 0; k < K; ++k) {
+	  c_ip += A[i+k*lda] * B[k+j*lda];
+        }
+        C[i+p*lda] = c_ip;
+      }
+    }  
+  }
+
+  if (fringe2 != 0) {
+    Mmax = M - fringe1;
+    for ( ; j < N; ++j) {
+      for (i = 0; i < Mmax; ++i) {
+        double c_ij = C[i + j*lda];
+        for (int k = 0; k < K; ++k) {
+	  c_ij += A[i+k*lda] * B[k+j*lda];
+        }
+	C[i+j*lda] = c_ij;
+      }
+    }   
+  }
+*/
 }
 
 /* This routine performs a dgemm operation
