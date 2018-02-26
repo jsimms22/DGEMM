@@ -22,57 +22,10 @@
 const char* dgemm_desc = "Simple blocked dgemm.";
 
 #define min(a,b) (((a)<(b))?(a):(b))
+
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
-/*//Works, but not fast
-static void do_avx_unrolled (int lda, int M, int N, int K, double* a, double* b, double* c) {
-  register __m128d cTmp, aTmp, bTmp;
-  for (int j = 0; j < N; ++j) {
-    for (int k = 0; k < K; ++k) {
-      bTmp = _mm_load1_pd(b + k + j*lda);
-      double* adda_mid = a + k*lda;
-      double* addc_mid = c + j*lda;
-      for (int i = 0; i < M/8*8; i += 8) {
-        double* adda = adda_mid + i;
-        double* addc = addc_mid + i;
-        
-	aTmp = _mm_loadu_pd(adda);
-	cTmp = _mm_loadu_pd(addc);
-	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
-	_mm_storeu_pd(addc, cTmp);
-	
-	aTmp = _mm_loadu_pd(adda + 2);
-	cTmp = _mm_loadu_pd(addc + 2);
-	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
-	_mm_storeu_pd((addc + 2), cTmp);
 
-	aTmp = _mm_loadu_pd(adda + 4);
-	cTmp = _mm_loadu_pd(addc + 4);
-	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
-	_mm_storeu_pd((addc + 4), cTmp);
-
-	aTmp = _mm_loadu_pd(adda + 6);
-	cTmp = _mm_loadu_pd(addc + 6);
-	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
-	_mm_storeu_pd((addc + 6), cTmp);
-      }
-
-      for (int i = M/8*8; i < M/2*2; i += 2) {
-        double* adda = adda_mid + i;
-        double* addc = addc_mid + i;
-        
-	aTmp = _mm_loadu_pd(adda);
-	cTmp = _mm_loadu_pd(addc);
-	cTmp = _mm_add_pd(cTmp, _mm_mul_pd(bTmp, aTmp));
-	_mm_storeu_pd(addc, cTmp);
-      }
-
-      for (int i = M/2*2; i < M; ++i) {
-        c[i + j*lda] += a[i + k*lda] * b[k + j*lda];
-      }
-    }
-  }
-}*/
  /*C Matrix 8x8			A Matrix   B Matrix
  * | 00 10 20 30 40 50 60 70 |  | 0x -> |  | 0x 1x 2x 3x 4x 5x 6x 7x |
  * | 01 11 21 31 41 51 61 71 |  | 1x -> |  |                         |
@@ -84,41 +37,155 @@ static void do_avx_unrolled (int lda, int M, int N, int K, double* a, double* b,
  * | 07 17 27 37 47 57 67 77 |  | 7x -> |  |                         |
  */
 
-static void do_avx256_unrolled (int lda, int K, double* a, double* b, double* c) {
-  //printf("Can you see me");
-  __m256d a0x_3x, /*a4x_7x,*/
-    bx0, bx1, bx2, bx3,/* bx4, bx5, bx6, bx7*/
-    c00_30, /*c40_70,*/
-    c01_31, /*c41_71,*/
-    c02_32, /*c42_72,*/
-    c03_33/*, c43_73*/;
+/*static void do_8x8 (int lda, int K, double* a, double* b, double* c) {
+  __m256d a0x_3x, a4x_7x,
+    bx0, bx1, bx2, bx3, 
+    bx4, bx5, bx6, bx7,
+    c00_30, c40_70, 
+    c01_31, c41_71,
+    c02_32, c42_72, 
+    c03_33, c43_73,
+    c04_34, c44_74, 
+    c05_35, c45_75,
+    c06_36, c46_76,
+    c07_37, c47_77;
+  
+  double* c01_31_ptr = c + lda;
+  double* c02_32_ptr = c01_31_ptr + lda;
+  double* c03_33_ptr = c02_32_ptr + lda;
+  double* c04_34_ptr = c03_33_ptr + lda;
+  double* c05_35_ptr = c04_34_ptr + lda;
+  double* c06_36_ptr = c05_35_ptr + lda;
+  double* c07_37_ptr = c06_36_ptr + lda;
+
+  c00_30 = _mm256_loadu_pd(c);
+  c40_70 = _mm256_loadu_pd(c + 4);
+  c01_31 = _mm256_loadu_pd(c01_31_ptr);
+  c41_71 = _mm256_loadu_pd(c01_31_ptr + 4);
+  c02_32 = _mm256_loadu_pd(c02_32_ptr);
+  c42_72 = _mm256_loadu_pd(c02_32_ptr + 4);
+  c03_33 = _mm256_loadu_pd(c03_33_ptr);
+  c43_73 = _mm256_loadu_pd(c03_33_ptr + 4);
+  c04_34 = _mm256_loadu_pd(c04_34_ptr);
+  c44_74 = _mm256_loadu_pd(c04_34_ptr + 4);
+  c05_35 = _mm256_loadu_pd(c05_35_ptr);
+  c45_75 = _mm256_loadu_pd(c05_35_ptr + 4);
+  c06_36 = _mm256_loadu_pd(c06_36_ptr);
+  c46_76 = _mm256_loadu_pd(c06_36_ptr + 4);
+  c07_37 = _mm256_loadu_pd(c07_37_ptr);
+  c47_77 = _mm256_loadu_pd(c07_37_ptr + 4);
+  
+  for (int x = 0; x < K; ++x) {
+    a0x_3x = _mm256_loadu_pd(a);
+    a4x_7x = _mm256_loadu_pd(a+4);
+    a += 8;
+
+    bx0 = _mm256_broadcast_sd(b++);
+    bx1 = _mm256_broadcast_sd(b++);
+    bx2 = _mm256_broadcast_sd(b++);
+    bx3 = _mm256_broadcast_sd(b++);
+    bx4 = _mm256_broadcast_sd(b++);
+    bx5 = _mm256_broadcast_sd(b++);
+    bx6 = _mm256_broadcast_sd(b++);
+    bx7 = _mm256_broadcast_sd(b++);
+
+    c00_30 = _mm256_add_pd(c00_30, _mm256_mul_pd(a0x_3x,bx0));
+    c40_70 = _mm256_add_pd(c40_70, _mm256_mul_pd(a4x_7x,bx0));
+    c01_31 = _mm256_add_pd(c01_31, _mm256_mul_pd(a0x_3x,bx1));
+    c41_71 = _mm256_add_pd(c41_71, _mm256_mul_pd(a4x_7x,bx1));
+    c02_32 = _mm256_add_pd(c02_32, _mm256_mul_pd(a0x_3x,bx2));
+    c42_72 = _mm256_add_pd(c42_72, _mm256_mul_pd(a4x_7x,bx2));
+    c03_33 = _mm256_add_pd(c03_33, _mm256_mul_pd(a0x_3x,bx3));
+    c43_73 = _mm256_add_pd(c43_73, _mm256_mul_pd(a4x_7x,bx3));
+    c04_34 = _mm256_add_pd(c04_34, _mm256_mul_pd(a0x_3x,bx4));
+    c44_74 = _mm256_add_pd(c44_74, _mm256_mul_pd(a4x_7x,bx4));
+    c05_35 = _mm256_add_pd(c05_35, _mm256_mul_pd(a0x_3x,bx5));
+    c45_75 = _mm256_add_pd(c45_75, _mm256_mul_pd(a4x_7x,bx5));
+    c06_36 = _mm256_add_pd(c06_36, _mm256_mul_pd(a0x_3x,bx6));
+    c46_76 = _mm256_add_pd(c46_76, _mm256_mul_pd(a4x_7x,bx6));
+    c07_37 = _mm256_add_pd(c07_37, _mm256_mul_pd(a0x_3x,bx7));
+    c47_77 = _mm256_add_pd(c47_77, _mm256_mul_pd(a4x_7x,bx7));
+  }
+
+  _mm256_storeu_pd(c,c00_30);
+  _mm256_storeu_pd(c+4,c40_70);
+  _mm256_storeu_pd(c01_31_ptr,c01_31);
+  _mm256_storeu_pd(c01_31_ptr+4,c41_71);
+  _mm256_storeu_pd(c02_32_ptr,c02_32);
+  _mm256_storeu_pd(c02_32_ptr+4,c42_72);
+  _mm256_storeu_pd(c03_33_ptr,c03_33);
+  _mm256_storeu_pd(c03_33_ptr+4,c43_73);
+  _mm256_storeu_pd(c04_34_ptr,c04_34);
+  _mm256_storeu_pd(c04_34_ptr+4,c44_74);
+  _mm256_storeu_pd(c05_35_ptr,c05_35);
+  _mm256_storeu_pd(c05_35_ptr+4,c45_75);
+  _mm256_storeu_pd(c06_36_ptr,c06_36);
+  _mm256_storeu_pd(c06_36_ptr+4,c46_76);
+  _mm256_storeu_pd(c07_37_ptr,c07_37);
+  _mm256_storeu_pd(c07_37_ptr+4,c47_77);
+}
+
+static inline void copy_a8 (int lda, const int K, double* a_src, double* a_dest) {
+  for (int i = 0; i < K; ++i) {
+    *a_dest++ = *a_src;
+    *a_dest++ = *(a_src + 1);
+    *a_dest++ = *(a_src + 2);
+    *a_dest++ = *(a_src + 3);
+    *a_dest++ = *(a_src + 4);
+    *a_dest++ = *(a_src + 5);
+    *a_dest++ = *(a_src + 6);
+    *a_dest++ = *(a_src + 7);
+    a_src += lda;
+  }
+}
+
+static inline void copy_b8 (int lda, const int K, double* b_src, double* b_dest) {
+  double *b_ptr0, *b_ptr1, *b_ptr2, *b_ptr3,
+  *b_ptr4, *b_ptr5, *b_ptr6, *b_ptr7;
+  b_ptr0 = b_src;
+  b_ptr1 = b_ptr0 + lda;
+  b_ptr2 = b_ptr1 + lda;
+  b_ptr3 = b_ptr2 + lda;
+  b_ptr4 = b_ptr3 + lda;
+  b_ptr5 = b_ptr4 + lda;
+  b_ptr6 = b_ptr5 + lda;
+  b_ptr7 = b_ptr6 + lda;
+
+  for (int i = 0; i < K; ++i) {
+    *b_dest++ = *b_ptr0++;
+    *b_dest++ = *b_ptr1++;
+    *b_dest++ = *b_ptr2++;
+    *b_dest++ = *b_ptr3++;
+    *b_dest++ = *b_ptr4++;
+    *b_dest++ = *b_ptr5++;
+    *b_dest++ = *b_ptr6++;
+    *b_dest++ = *b_ptr7++;
+  }
+}*/
+
+static void do_4x4 (int lda, int K, double* a, double* b, double* c) {
+  register __m256d a0x_3x,
+    bx0, bx1, bx2, bx3,
+    c00_30, c01_31,
+    c02_32, c03_33;
   
   double* c01_31_ptr = c + lda;
   double* c02_32_ptr = c01_31_ptr + lda;
   double* c03_33_ptr = c02_32_ptr + lda;
   
   c00_30 = _mm256_loadu_pd(c);
-  //c40_70 = _mm256_loadu_pd(c + 4);
   c01_31 = _mm256_loadu_pd(c01_31_ptr);
-  //c41_71 = _mm256_loadu_pd(c + lda + 4);
   c02_32 = _mm256_loadu_pd(c02_32_ptr);
-  //c42_72 = _mm256_loadu_pd(c + 2*lda + 4);
   c03_33 = _mm256_loadu_pd(c03_33_ptr);
-  //c43_73 = _mm256_loadu_pd(c + 3*lda + 4);
   
   for (int x = 0; x < K; ++x) {
     a0x_3x = _mm256_load_pd(a);
-    //a4x_7x = _mm256_load_pd(a+4);
     a += 4;
 
     bx0 = _mm256_broadcast_sd(b++);
     bx1 = _mm256_broadcast_sd(b++);
     bx2 = _mm256_broadcast_sd(b++);
     bx3 = _mm256_broadcast_sd(b++);
-    //bx4 = _mm256_broadcast_sd(b++);
-    //bx5 = _mm256_broadcast_sd(b++);
-    //bx6 = _mm256_broadcast_sd(b++);
-    //bx7 = _mm256_broadcast_sd(b++);
 
     c00_30 = _mm256_add_pd(c00_30, _mm256_mul_pd(a0x_3x,bx0));
     c01_31 = _mm256_add_pd(c01_31, _mm256_mul_pd(a0x_3x,bx1));
@@ -132,7 +199,7 @@ static void do_avx256_unrolled (int lda, int K, double* a, double* b, double* c)
   _mm256_storeu_pd(c03_33_ptr,c03_33);
 }
 
-static inline void copy_a (int lda, const int K, double* a_src, double* a_dest) {
+static inline void copy_a4 (int lda, const int K, double* a_src, double* a_dest) {
   for (int i = 0; i < K; ++i) {
     *a_dest++ = *a_src;
     *a_dest++ = *(a_src + 1);
@@ -142,7 +209,7 @@ static inline void copy_a (int lda, const int K, double* a_src, double* a_dest) 
   }
 }
 
-static inline void copy_b (int lda, const int K, double* b_src, double* b_dest) {
+static inline void copy_b4 (int lda, const int K, double* b_src, double* b_dest) {
   double *b_ptr0, *b_ptr1, *b_ptr2, *b_ptr3;
   b_ptr0 = b_src;
   b_ptr1 = b_ptr0 + lda;
@@ -157,7 +224,7 @@ static inline void copy_b (int lda, const int K, double* b_src, double* b_dest) 
   }
 }
 
-static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
+/*static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it declare?");
     __m256d m0,m1,m2,m3;
     //printf("Did it declare?");
@@ -191,32 +258,76 @@ static inline void do_simple (int lda, int M, int N, int K, double* a, double* b
         c[i+j*lda] += cij;
       }
     }
-}
+}*/
+
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
-  //printf("Did it enter do_block?\n");
   double A_block[M*K], B_block[K*N];
   double *a_ptr, *b_ptr, *c;
+/*
+ * 8x8 blocks: slower than 4x4 blocks
+ *
+    int Nmax = N-7;
+    int Mmax = M-7;
+    int fringe1 = M%8;
+    int fringe2 = N%8;
+  
+    int i = 0, j = 0, p = 0;
+    
+    for (j = 0; j < Nmax; j += 8) {
+      b_ptr = &B_block[j*K];
+      copy_b8 (lda, K, B + j*lda, b_ptr);
+      for (i = 0; i < Mmax; i += 8) {
+        a_ptr = &A_block[i*K];
+        if (j == 0) copy_a8 (lda, K, A + i, a_ptr);
+        c = C + i + j*lda;
+        do_8x8 (lda, K, a_ptr, b_ptr, c);
+      }
+    }
 
-  const int Nmax = N-3;
+    if (fringe1 != 0) {
+      for ( ; i < M; ++i) {
+        for (p = 0; p < N; ++p) {
+          double c_ip = C[i + p*lda];
+          for (int k = 0; k < K; ++k) {
+	    c_ip += A[i+k*lda] * B[k+j*lda];
+          }
+          C[i+p*lda] = c_ip;
+        }
+      }  
+    }
+
+    if (fringe2 != 0) {
+      Mmax = M - fringe1;
+      for ( ; j < N; ++j) {
+        for (i = 0; i < Mmax; ++i) {
+          double c_ij = C[i + j*lda];
+          for (int k = 0; k < K; ++k) {
+	    c_ij += A[i+k*lda] * B[k+j*lda];
+          }
+	  C[i+j*lda] = c_ij;
+        }
+      }   
+    }*/
+
+  int Nmax = N-3;
   int Mmax = M-3;
   int fringe1 = M%4;
   int fringe2 = N%4;
   
   int i = 0, j = 0, p = 0;
-    
+  
   for (j = 0; j < Nmax; j += 4) {
     b_ptr = &B_block[j*K];
-    copy_b (lda, K, B + j*lda, b_ptr);
+    copy_b4 (lda, K, B + j*lda, b_ptr);
     for (i = 0; i < Mmax; i += 4) {
-      //printf("j = %d\t, i = %d \n",j,i);
       a_ptr = &A_block[i*K];
-      if (j == 0) copy_a (lda, K, A + i, a_ptr);
+      if (j == 0) copy_a4 (lda, K, A + i, a_ptr);
       c = C + i + j*lda;
-      do_avx256_unrolled (lda, K, a_ptr, b_ptr, c);
+      do_4x4 (lda, K, a_ptr, b_ptr, c);
     }
   }
 
@@ -227,10 +338,11 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
         for (int k = 0; k < K; ++k) {
 	  c_ip += A[i+k*lda] * B[k+j*lda];
         }
-	C[i+p*lda] = c_ip;
+        C[i+p*lda] = c_ip;
       }
     }  
   }
+
   if (fringe2 != 0) {
     Mmax = M - fringe1;
     for ( ; j < N; ++j) {
@@ -243,59 +355,19 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
       }
     }   
   }
-
-  //printf("M = %d\t,N = %d,K = %d, \n",M,N,K);
-  //printf("Did it declare?");
-
-  /*register char status;
-  if (M == N) {
-    if (K == N) {
-      if (M == K) { 
-        if (M%4 == 0) {
-	  if (N%4 == 0) {
-	    if (K%4 == 0) {
-	      status = '0';
-	    }
-	  }
-	} else if (M%2 == 0) {
-	    if (N%2 == 0) {
-	      if (K%2 == 0) {
-		status = '1';
-	      }
-	    }
-	  } else {
-	  status = '2';
-	}
-      }
-    }
-  }
-
-  //printf("Did it declare?");
-
-  if (status == '0') {
-    do_avx256 (lda, M, N, K, A, B, C);
-  } else if (status == '1') {
-    do_simple (lda, M, N, K, A, B, C);
-  } else {
-    do_simple (lda, M, N, K, A, B, C);
-  }*/
-
-  //printf("exiting a block\n");
- 
-  //Does not run fast
-  //do_avx_unrolled (lda, M, N, K, A, B, C);
 }
+
 /* This routine performs a dgemm operation
  *  C := C + A * B
  * where A, B, and C are lda-by-lda matrices stored in column-major format. 
  * On exit, A and B maintain their input values. */
-void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
+void square_dgemm (/*int iii, */int lda, double* A, double* B, double* C)
 {
-  //printf("Do you see me now at %d\t \n",lda);
+  
   //Block size in 1D for L2 cache - BLOCK2 - for L1 cache - BLOCK 1 - 
-  int BLOCK1 = 256;
-  int BLOCK2 = 512;
-  //Proposed blocking method for 2 levels of memory - L1 and L2
+  register int BLOCK1 = 256;
+  register int BLOCK2 = 512;
+
   for (int x = 0; x < lda; x += BLOCK2) {
     int lim_k = x + min (BLOCK2,lda-x);
     for (int y = 0; y < lda; y += BLOCK2) {
@@ -308,8 +380,6 @@ void square_dgemm (/*int iii,*/int lda, double* A, double* B, double* C)
 	    int N = min (BLOCK1,lim_j-j);
 	    for (int i = z; i < lim_i; i += BLOCK1) {
 	      int M = min (BLOCK1,lim_i-i);
-	      //printf("M = %d\t, N = %d, K = %d \n",M,N,K);
-	      //printf("i = %d\t, j = %d, k = %d \n",i,j,k); 
               do_block(lda, M, N, K, A + i + k*lda, B + k + j*lda, C + i + j*lda);
             }
           }
