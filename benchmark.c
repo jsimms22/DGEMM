@@ -71,9 +71,9 @@ int main (int argc, char **argv)
 {
 /*double highestGrade = -1.0;
 int highBlock = 0;
-for (int iii = 5;iii < 200;++iii){
-*/  printf ("Description:\t%s\n\n", dgemm_desc);
-
+for (int iii = 8;iii < 400; iii += 4){
+  printf ("Description:\t%s\n\n", dgemm_desc);
+*/
   /* Test sizes should highlight performance dips at multiples of certain powers-of-two */
 
   int test_sizes[] = 
@@ -82,10 +82,11 @@ for (int iii = 5;iii < 200;++iii){
  /* {31,32,33,63,64,65,95,96,97,127,128,129,159,160,161,191,192,193,223,224,225,255,256,257,287,288,289,319,320,321,351,352,353,383,384,385,415,416,417,447,448,449,479,480,481,511,512,513,543,544,545,575,576,577,607,608,609,639,640,641,671,672,673,703,704,705,735,736,737,767,768,769,799,800,801,831,832,833,863,864,865,895,896,897,927,928,929,959,960,961,991,992,993,1023,1024,1025};
 */
   /* A representative subset of the first list. Currently uncommented. */ 
-  { /*31,*/ 32, 96, /*97,127,*/ 128,/* 129, 191,*/ 192,/* 229, 255,*/ 256, /*257,
-    319,*/ 320,/* 321, 417, 479,*/ 480,/* 511,*/ 512,/* 639,*/ 640,/* 767,*/ 768/*, 769*/ };
-
- // {8};
+  /*{  32, 96, 97,127, 128, 129, 191, 192, 229, 255, 256, 257,
+    319, 320, 321, 417, 479, 480, 511, 512, 639, 640, 767, 768, 769 };
+  */
+  {32,96,128,192,256,320,480,512,640,768};
+  //{8};
   int nsizes = sizeof(test_sizes)/sizeof(test_sizes[0]);
 
   /* assume last size is also the largest size */
@@ -120,12 +121,12 @@ for (int iii = 5;iii < 200;++iii){
     for (int n_iterations = 1; seconds < timeout; n_iterations *= 2) 
     {
       //Warm-up 
-      square_dgemm (n, A, B, C);
+      square_dgemm (/*iii,*/n, A, B, C);
 
       // Benchmark n_iterations runs of square_dgemm
       seconds = -wall_time();
       for (int it = 0; it < n_iterations; ++it)
-	square_dgemm (n, A, B, C);
+	square_dgemm (/*iii,*/n, A, B, C);
       seconds += wall_time();
 
      //  compute Gflop/s rate
@@ -170,7 +171,7 @@ for (int iii = 5;iii < 200;++iii){
   aveper/=nsizes*1.0;
   
   // Assigning grade based on average percentage reached (50% gets 75; 80% gets 100; rest distributed proportionally) */
-  if (aveper > 43) grade = 100.0;
+  if (aveper > 50) grade = 100.0;
   else if (aveper > 25) grade = (aveper-25)*0.25*100.0/30.0 + 75.0;
   else
      grade = aveper * 4 * 0.75;
@@ -178,12 +179,13 @@ for (int iii = 5;iii < 200;++iii){
   // Printing average percentage and grade to screen
   printf("Average percentage of Peak = %g\nGrade = %g\n",aveper,grade); 
   free (buf);
-//if (highestGrade < grade){
-//	highestGrade = grade;
-//	highBlock = iii;
-//  }
-//printf("Finished block size: %d\t",iii);
-//}
-//printf("%d\t",highBlock);
+/*if (highestGrade < grade){
+	highestGrade = grade;
+	highBlock = iii;
+  }
+printf("Finished block size: %d\t\n",iii);
+}
+printf("%d\t\n",highBlock);
+*/
   return 0;
 }
