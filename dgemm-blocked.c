@@ -376,7 +376,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
 */
 
  /* 4x4 blocks */
-  int Nmax = N-3;
+  const int Nmax = N-3;
   int Mmax = M-3;
   int fringe1 = M%4;
   int fringe2 = N%4;
@@ -395,28 +395,24 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
   }
 
   if (fringe1 != 0) {
-    for ( ; i < M; ++i) {
-      for (p = 0; p < N; ++p) {
-        double c_ip = ARRAY(C,i,p);
-        for (int k = 0; k < K; ++k) {
+    for ( ; i < M; ++i)
+      for ( ; p < N; ++p) {
+        double c_ip = 0.0;
+        for (int k = 0; k < K; ++k)
 	  c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
-        }
-        ARRAY(C,i,p) = c_ip;
-      }
-    }  
+        ARRAY(C,i,p) += c_ip;
+      }  
   }
 
   if (fringe2 != 0) {
     Mmax = M - fringe1;
-    for ( ; j < N; ++j) {
+    for ( ; j < N; ++j)
       for (i = 0; i < Mmax; ++i) {
-        double c_ij = ARRAY(C,i,j);
-        for (int k = 0; k < K; ++k) {
+        double c_ij = 0.0;
+        for (int k = 0; k < K; ++k)
 	  c_ij += ARRAY(A,i,k) * ARRAY(B,k,j);
-        }
-	ARRAY(C,i,j) = c_ij;
-      }
-    }   
+	ARRAY(C,i,j) += c_ij;
+      }   
   }
 
  /* 2x2 blocks */
