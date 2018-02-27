@@ -1,36 +1,21 @@
-/* 
- *     Please include compiler name below (you may also include any other modules you would like to be loaded)
- *
- *     COMPILER= gnu
- *
- *         Please include All compiler flags and libraries as you want them run. You can simply copy this over from the Makefile's first few lines
- *          
- *          CC = cc
- *          OPT = -O3
- *          CFLAGS = -Wall -std=gnu99 $(OPT)
- *          MKLROOT = /opt/intel/composer_xe_2013.1.117/mkl
- *          LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_sequential.a $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm
- *
- *          */
-
-#include <stdlib.h>
-#include <time.h>
-#include <immintrin.h>
-#include <pmmintrin.h>
+#include <mmintrin.h>
 #include <xmmintrin.h>
+#include <pmmintrin.h>
 #include <emmintrin.h>
-const char* dgemm_desc = "Tuned blocked dgemm.";
+#include <string.h>
 
-#define BLOCK1 256
-#define BLOCK2 512
+const char* dgemm_desc = "Simple blocked dgemm.";
 
+#define BLOCK_L1 256
+#define BLOCK_L2 512
+
+#define turn_even(x) (((x) & 1) ? (x+1) : (x))
 #define min(a,b) (((a)<(b))?(a):(b))
-#define turn_even(x) (((x) & 1) ? (x+!) : (x))
 
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 
-#define ARRAY(A,i,j) (A)[(j)*lda + (1)]
+#define ARRAY(A,i,j) (A)[(j)*lda + (i)]
 
  /*C Matrix 8x8			A Matrix   B Matrix
  * | 00 10 20 30 40 50 60 70 |  | 0x -> |  | 0x 1x 2x 3x 4x 5x 6x 7x |
@@ -326,8 +311,8 @@ static inline void do_simple (int lda, int M, int N, int K, double* a, double* b
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
-  double A_block[M*K], B_block[K*N];
-  double *a_ptr, *b_ptr, *c;
+ // double A_block[M*K], B_block[K*N];
+ // double *a_ptr, *b_ptr, *c;
 /*
  * 8x8 blocks: slower than 4x4 blocks
  *
@@ -376,45 +361,62 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
 */
 
  /* 4x4 blocks */
+  double A_block[M*K], B_block[K*N];
+  double *a_ptr, *b_ptr, *c;
+
   const int Nmax = N-3;
   int Mmax = M-3;
   int fringe1 = M%4;
   int fringe2 = N%4;
-  
+
   int i = 0, j = 0, p = 0;
-  
-  for (j = 0; j < Nmax; j += 4) {
+
+  /* For each column of B */
+  for (j = 0 ; j < Nmax; j += 4) 
+  {
     b_ptr = &B_block[j*K];
-    copy_b4 (lda, K, B + j*lda, b_ptr);
+    // copy and transpose B_block
+    copy_b4(lda, K, B + j*lda, b_ptr);
+    /* For each row of A */
     for (i = 0; i < Mmax; i += 4) {
       a_ptr = &A_block[i*K];
-      if (j == 0) copy_a4 (lda, K, A + i, a_ptr);
+      if (j == 0) copy_a4(lda, K, A + i, a_ptr);
       c = C + i + j*lda;
-      do_4x4 (lda, K, a_ptr, b_ptr, c);
+      do_4x4(lda, K, a_ptr, b_ptr, c);
     }
   }
 
-  if (fringe1 != 0) {
+  /* Handle "fringes" */
+  if (fringe1 != 0) 
+  {
+    /* For each row of A */
     for ( ; i < M; ++i)
-      for ( ; p < N; ++p) {
-        double c_ip = 0.0;
+      /* For each column of B */ 
+      for (p = 0; p < N; ++p) 
+      {
+        /* Compute C[i,j] */
+        double c_ip = ARRAY(C,i,p);
         for (int k = 0; k < K; ++k)
-	  c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
-        ARRAY(C,i,p) += c_ip;
-      }  
+          c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
+        ARRAY(C,i,p) = c_ip;
+      }
   }
-
-  if (fringe2 != 0) {
+  if (fringe2 != 0) 
+  {
     Mmax = M - fringe1;
+    /* For each column of B */
     for ( ; j < N; ++j)
-      for (i = 0; i < Mmax; ++i) {
-        double c_ij = 0.0;
+      /* For each row of A */ 
+      for (i = 0; i < Mmax; ++i) 
+      {
+        /* Compute C[i,j] */
+        double cij = ARRAY(C,i,j);
         for (int k = 0; k < K; ++k)
-	  c_ij += ARRAY(A,i,k) * ARRAY(B,k,j);
-	ARRAY(C,i,j) += c_ij;
-      }   
-  }
-
+          cij += ARRAY(A,i,k) * ARRAY(B,k,j);
+        ARRAY(C,i,j) = cij;
+      }
+}
+  
  /* 2x2 blocks */
 /*  int Nmax = N-1;
   int Mmax = M-1;
