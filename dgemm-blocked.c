@@ -1,4 +1,5 @@
 #include <mmintrin.h>
+#include <immintrin.h>
 #include <xmmintrin.h>
 #include <pmmintrin.h>
 #include <emmintrin.h>
@@ -6,8 +7,8 @@
 
 const char* dgemm_desc = "Simple blocked dgemm.";
 
-#define BLOCK_L1 256
-#define BLOCK_L2 512
+//#define BLOCK1 256
+//#define BLOCK2 512
 
 #define turn_even(x) (((x) & 1) ? (x+1) : (x))
 #define min(a,b) (((a)<(b))?(a):(b))
@@ -270,7 +271,7 @@ static inline void copy_b2 (int lda, const int K, double* b_src, double* b_dest)
   }
 }
 */
-static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
+/*static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it declare?");
     __m256d m0,m1,m2,m3;
     //printf("Did it declare?");
@@ -288,7 +289,7 @@ static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, doubl
         _mm256_storeu_pd(c+i+j*lda,m0);
       }
     }
-}
+}*/
 /*
 static inline void do_simple (int lda, int M, int N, int K, double* a, double* b, double* c) {
     //printf("Did it do else?");
@@ -309,7 +310,7 @@ static inline void do_simple (int lda, int M, int N, int K, double* a, double* b
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
-static inline void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
+static void inline do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
  // double A_block[M*K], B_block[K*N];
  // double *a_ptr, *b_ptr, *c;
@@ -395,7 +396,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
       for (p = 0; p < N; ++p) 
       {
         /* Compute C[i,j] */
-        double c_ip = ARRAY(C,i,p);
+        register double c_ip = ARRAY(C,i,p);
         for (int k = 0; k < K; ++k)
           c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
         ARRAY(C,i,p) = c_ip;
@@ -410,7 +411,7 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
       for (i = 0; i < Mmax; ++i) 
       {
         /* Compute C[i,j] */
-        double cij = ARRAY(C,i,j);
+        register double cij = ARRAY(C,i,j);
         for (int k = 0; k < K; ++k)
           cij += ARRAY(A,i,k) * ARRAY(B,k,j);
         ARRAY(C,i,j) = cij;
@@ -467,58 +468,11 @@ static inline void do_block (int lda, int M, int N, int K, double* A, double* B,
  *  C := C + A * B
  * where A, B, and C are lda-by-lda matrices stored in column-major format. 
  * On exit, A and B maintain their input values. */
-void square_dgemm (/*int iii, */int lda, double* A, double* B, double* C)
+void square_dgemm (/*int iii,*/ int lda, double* A, double* B, double* C)
 {
-  /*double* padA, padB, padC;
-  int padNum;
-  if (lda%4 != 0) {
-    padNum = lda%4;
-    double* padded = NULL;
-    padded = (double*) malloc (3 * (lda+padNum) * (lda+padNum) * sizeof(double));
-    padA = padded + 0;
-    padB = padA;
-    padC = padB;
-    memset (padA,0,lda*lda*sizeof(double));
-    memset (padB,0,lda*lda*sizeof(double));
-    memset (padC,0,lda*lda*sizeof(double));
-    for (int i = 0; i < lda*lda; ++i) {
-      padA[i] = A[i];
-      padB[i] = B[i];
-      padC[i] = C[i];
-        if (i == lda-1) i += padNum;
-    }
-  } */
-
   //Block size in 1D for L2 cache - BLOCK2 - for L1 cache - BLOCK 1 - 
-  //register int BLOCK1 = 256;
-  //register int BLOCK2 = 512;
-
-  if (lda == 5) {
-    printf("Input Matrices");
-    printf("A matrix\n");
-    for (int i = 0; i < lda; ++i) {
-      for (int j = 0; j < lda; ++j) {
-        printf("%g\t ", A[i + j*lda]);
-      }
-      printf("\n");
-    }
-    printf("\n");
-    printf("B matrix\n");
-    for (int i = 0; i < lda; ++i) {
-      for (int j = 0; j < lda; ++j) {
-        printf("%g\t ", B[i + j*lda]);
-      }
-      printf("\n");
-    }
-    printf("\n");
-    printf("C matrix\n");
-    for (int i = 0; i < lda; ++i) {
-      for (int j = 0; j < lda; ++j) {
-        printf("%g\t ", C[i + j*lda]);
-      }
-      printf("\n");
-    }
-  }
+  register int BLOCK1 = 256;
+  register int BLOCK2 = 512;
 
   for (int x = 0; x < lda; x += BLOCK2) {
     int lim_k = x + min (BLOCK2,lda-x);
@@ -537,41 +491,6 @@ void square_dgemm (/*int iii, */int lda, double* A, double* B, double* C)
           }
         }
       }
-    }
-  }
-/*
-  if (lad%4 != 0) {
-    for (int i = 0; i < lda*lda; ++i) { 
-      A[i] = padA[i];
-      B[i] = padB[i];
-      C[i] = padC[i];
-      if (i == lda-1) i += padNum;
-    }
-  }*/
-  if (lda == 5) {
-    printf("Output Matrices");
-    printf("A matrix\n");
-    for (int i = 0; i < lda; ++i) {
-      for (int j = 0; j < lda; ++j) {
-        printf("%g\t ", A[i + j*lda]);
-      }
-      printf("\n");
-    }
-    printf("\n");
-    printf("B matrix\n");
-    for (int i = 0; i < lda; ++i) {
-      for (int j = 0; j < lda; ++j) {
-        printf("%g\t ", B[i + j*lda]);
-      }
-      printf("\n");
-    }
-    printf("\n");
-    printf("C matrix\n");
-    for (int i = 0; i < lda; ++i) {
-      for (int j = 0; j < lda; ++j) {
-        printf("%g\t ", C[i + j*lda]);
-      }
-      printf("\n");
     }
   }
 }
