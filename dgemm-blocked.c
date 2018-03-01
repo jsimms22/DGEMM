@@ -28,8 +28,7 @@ const char* dgemm_desc = "Simple blocked dgemm.";
  * | 06 16 26 36 46 56 66 76 |  | 6x -> |  |                         |
  * | 07 17 27 37 47 57 67 77 |  | 7x -> |  |                         |
  */
-
-/*static void do_8x8 (int lda, int K, double* a, double* b, double* c) {
+static void do_8x8 (int lda, int K, double* a, double* b, double* c) {
   __m256d a0x_3x, a4x_7x,
     bx0, bx1, bx2, bx3, 
     bx4, bx5, bx6, bx7,
@@ -153,7 +152,7 @@ static inline void copy_b8 (int lda, const int K, double* b_src, double* b_dest)
     *b_dest++ = *b_ptr6++;
     *b_dest++ = *b_ptr7++;
   }
-}*/
+}
 
  /*C Matrix 4x4     A Matrix   B Matrix
  * | 00 10 20 30 |  | 0x -> |  | 0x 1x 2x 3x |
@@ -226,7 +225,7 @@ static inline void copy_b4 (int lda, const int K, double* b_src, double* b_dest)
  * | 00 10 |  | 0x -> |  | 0x 1x |
  * | 01 11 |  | 1x -> |  |       |
  */
-/*static void do_2x2 (int lda, int K, double* a, double* b, double* c) {
+static void do_2x2 (int lda, int K, double* a, double* b, double* c) {
   register __m128d a0x_1x,
     bx0, bx1,
     c00_10,
@@ -270,115 +269,82 @@ static inline void copy_b2 (int lda, const int K, double* b_src, double* b_dest)
     *b_dest++ = *b_ptr1++;
   }
 }
-*/
-/*static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
-    //printf("Did it declare?");
-    __m256d m0,m1,m2,m3;
-    //printf("Did it declare?");
-    for (int i = 0; i < M; i += 4) {
-      for (int j = 0; j < N; ++j) {
-        m0 = _mm256_setzero_pd();  
-        for (int k = 0; k < K; ++k) {
-	  m1 = _mm256_load_pd(a+i+k*lda);
-	  m2 = _mm256_broadcast_sd(b+k+j*lda);
-	  m3 = _mm256_mul_pd(m1,m2);
-	  m0 = _mm256_add_pd(m0,m3);
-        }
-        m1 = _mm256_load_pd(c+i+j*lda);
-        m0 = _mm256_add_pd(m0,m1);
-        _mm256_storeu_pd(c+i+j*lda,m0);
+
+static void do_avx256 (int lda, int M, int N, int K, double* a, double* b, double* c) {
+  __m256d m0,m1,m2,m3;
+  for (int i = 0; i < M; i += 4) {
+    for (int j = 0; j < N; ++j) {
+      m0 = _mm256_setzero_pd();  
+      for (int k = 0; k < K; ++k) {
+	m1 = _mm256_load_pd(a+i+k*lda);
+	m2 = _mm256_broadcast_sd(b+k+j*lda);
+	m3 = _mm256_mul_pd(m1,m2);
+	m0 = _mm256_add_pd(m0,m3);
       }
+      m1 = _mm256_load_pd(c+i+j*lda);
+      m0 = _mm256_add_pd(m0,m1);
+      _mm256_storeu_pd(c+i+j*lda,m0);
     }
-}*/
-/*
+  }
+}
+
 static inline void do_simple (int lda, int M, int N, int K, double* a, double* b, double* c) {
-    //printf("Did it do else?");
-    // For each row of A
-    for (int i = 0; i < M; ++i) {
-      // For each column of B
-      for (int j = 0; j < N; ++j) {
-        // Compute C[i,j] 
-        register double cij = 0.0;
-        for (int k = 0; k < K; ++k){
-          cij += a[i+k*lda] * b[k+j*lda];
-	}
-        c[i+j*lda] += cij;
+  //printf("Did it do else?");
+  // For each row of A
+  for (int i = 0; i < M; ++i) {
+    // For each column of B
+    for (int j = 0; j < N; ++j) {
+      // Compute C[i,j] 
+      register double cij = 0.0;
+      for (int k = 0; k < K; ++k){
+        cij += a[i+k*lda] * b[k+j*lda];
       }
+      c[i+j*lda] += cij;
     }
-}*/
+  }
+}
 
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static void inline do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
- // double A_block[M*K], B_block[K*N];
- // double *a_ptr, *b_ptr, *c;
-/*
- * 8x8 blocks: slower than 4x4 blocks
- *
-    int Nmax = N-7;
-    int Mmax = M-7;
-    int fringe1 = M%8;
-    int fringe2 = N%8;
-  
-    int i = 0, j = 0, p = 0;
-    
-    for (j = 0; j < Nmax; j += 8) {
-      b_ptr = &B_block[j*K];
-      copy_b8 (lda, K, B + j*lda, b_ptr);
-      for (i = 0; i < Mmax; i += 8) {
-        a_ptr = &A_block[i*K];
-        if (j == 0) copy_a8 (lda, K, A + i, a_ptr);
-        c = C + i + j*lda;
-        do_8x8 (lda, K, a_ptr, b_ptr, c);
-      }
-    }
-
-    if (fringe1 != 0) {
-      for ( ; i < M; ++i) {
-        for (p = 0; p < N; ++p) {
-          double c_ip = C[i + p*lda];
-          for (int k = 0; k < K; ++k) {
-	    c_ip += A[i+k*lda] * B[k+j*lda];
-          }
-          C[i+p*lda] = c_ip;
-        }
-      }  
-    }
-
-    if (fringe2 != 0) {
-      Mmax = M - fringe1;
-      for ( ; j < N; ++j) {
-        for (i = 0; i < Mmax; ++i) {
-          double c_ij = C[i + j*lda];
-          for (int k = 0; k < K; ++k) {
-	    c_ij += A[i+k*lda] * B[k+j*lda];
-          }
-	  C[i+j*lda] = c_ij;
-        }
-      }   
-    }
-*/
-
- /* 4x4 blocks */
   double A_block[M*K], B_block[K*N];
   double *a_ptr, *b_ptr, *c;
 
-  const int Nmax = N-3;
+/*
+ * 8x8 blocks: slower than 4x4 blocks
+ */
+  /*int Nmax = N-7;
+  int Mmax = M-7;
+  int fringe1 = M%8;
+  int fringe2 = N%8;
+  
+  int i = 0, j = 0, p = 0;
+    
+  for (j = 0; j < Nmax; j += 8) {
+    b_ptr = &B_block[j*K];
+    copy_b8 (lda, K, B + j*lda, b_ptr);
+    for (i = 0; i < Mmax; i += 8) {
+      a_ptr = &A_block[i*K];
+      if (j == 0) copy_a8 (lda, K, A + i, a_ptr);
+      c = C + i + j*lda;
+      do_8x8 (lda, K, a_ptr, b_ptr, c);
+    }
+  }*/
+
+ /* 4x4 blocks */
+  int Nmax = N-3;
   int Mmax = M-3;
   int fringe1 = M%4;
   int fringe2 = N%4;
 
-  int i = 0, j = 0, p = 0;
+  register int i = 0, j = 0, p = 0;
 
-  /* For each column of B */
   for (j = 0 ; j < Nmax; j += 4) 
   {
     b_ptr = &B_block[j*K];
-    // copy and transpose B_block
     copy_b4(lda, K, B + j*lda, b_ptr);
-    /* For each row of A */
     for (i = 0; i < Mmax; i += 4) {
       a_ptr = &A_block[i*K];
       if (j == 0) copy_a4(lda, K, A + i, a_ptr);
@@ -387,39 +353,8 @@ static void inline do_block (int lda, int M, int N, int K, double* A, double* B,
     }
   }
 
-  /* Handle "fringes" */
-  if (fringe1 != 0) 
-  {
-    /* For each row of A */
-    for ( ; i < M; ++i)
-      /* For each column of B */ 
-      for (p = 0; p < N; ++p) 
-      {
-        /* Compute C[i,j] */
-        register double c_ip = ARRAY(C,i,p);
-        for (int k = 0; k < K; ++k)
-          c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
-        ARRAY(C,i,p) = c_ip;
-      }
-  }
-  if (fringe2 != 0) 
-  {
-    Mmax = M - fringe1;
-    /* For each column of B */
-    for ( ; j < N; ++j)
-      /* For each row of A */ 
-      for (i = 0; i < Mmax; ++i) 
-      {
-        /* Compute C[i,j] */
-        register double cij = ARRAY(C,i,j);
-        for (int k = 0; k < K; ++k)
-          cij += ARRAY(A,i,k) * ARRAY(B,k,j);
-        ARRAY(C,i,j) = cij;
-      }
-}
-  
  /* 2x2 blocks */
-/*  int Nmax = N-1;
+  /*int Nmax = N-1;
   int Mmax = M-1;
   int fringe1 = M%2;
   int fringe2 = N%2;
@@ -435,33 +370,35 @@ static void inline do_block (int lda, int M, int N, int K, double* A, double* B,
       c = C + i + j*lda;
       do_2x2 (lda, K, a_ptr, b_ptr, c);
     }
-  }
+  }*/
 
+  /* Handle "fringes" */
   if (fringe1 != 0) {
-    for ( ; i < M; ++i) {
+    /* For each row of A */
+    for ( ; i < M; ++i)
+      /* For each column of B */ 
       for (p = 0; p < N; ++p) {
-        double c_ip = C[i + p*lda];
-        for (int k = 0; k < K; ++k) {
-	  c_ip += A[i+k*lda] * B[k+j*lda];
-        }
-        C[i+p*lda] = c_ip;
+        /* Compute C[i,j] */
+        register double c_ip = ARRAY(C,i,p);
+        for (int k = 0; k < K; ++k)
+          c_ip += ARRAY(A,i,k) * ARRAY(B,k,p);
+        ARRAY(C,i,p) = c_ip;
       }
-    }  
   }
 
   if (fringe2 != 0) {
     Mmax = M - fringe1;
-    for ( ; j < N; ++j) {
+    /* For each column of B */
+    for ( ; j < N; ++j)
+      /* For each row of A */ 
       for (i = 0; i < Mmax; ++i) {
-        double c_ij = C[i + j*lda];
-        for (int k = 0; k < K; ++k) {
-	  c_ij += A[i+k*lda] * B[k+j*lda];
-        }
-	C[i+j*lda] = c_ij;
+        /* Compute C[i,j] */
+        register double cij = ARRAY(C,i,j);
+        for (int k = 0; k < K; ++k)
+          cij += ARRAY(A,i,k) * ARRAY(B,k,j);
+        ARRAY(C,i,j) = cij;
       }
-    }   
   }
-*/
 }
 
 /* This routine performs a dgemm operation
