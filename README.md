@@ -37,4 +37,3 @@ random sites that have read:
 resources for AVX instruction and intrinsics:
 1) https://pdfs.semanticscholar.org/852c/0115d6011b6cd2746d18f56d64a53e65af5d.pdf
 2) https://software.intel.com/en-us/articles/how-to-use-intrinsics
-3) https://github.com/changlan/dgemm/blob/master/src/dgemm-blocked.c
